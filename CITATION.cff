@@ -1,0 +1,21 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: gutpython
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Adam
+    family-names: Knapp
+    email: adam.knapp@medicine.ufl.edu
+    affiliation: University of Florida
+    orcid: 'https://orcid.org/0000-0002-5719-6003'
+repository-code: 'https://github.com/knappa/gutpython'
+abstract: >-
+  Implementation of GutLogo in Python
+keywords:
+  - ABM
+license: Apache-2.0
