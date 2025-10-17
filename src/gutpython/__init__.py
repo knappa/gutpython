@@ -1188,7 +1188,7 @@ class GutPython:
         #   ;; setup the stuckChance
         #   setStuckChance
 
-        # TODO
+        self.set_stuck_chance()
 
         #   ;; Setup for stop if negative metas
         #   set negMeta false
@@ -1199,3 +1199,27 @@ class GutPython:
         #   reset-ticks
 
         # TODO
+
+    def set_stuck_chance(self):
+        occupancy = np.zeros(self.geometry, dtype=np.int64)
+
+        bifido_patches = self.bifido_locations[self.bifido_mask,:].astype(np.int64)
+        # TODO: vectorize. need to check what happens with repeat locs using
+        #  occupancy[tuple(bifido_patches.T)] += 1
+        for idx in range(bifido_patches.shape[0]):
+            occupancy[tuple(bifido_patches[idx])] += 1
+
+        desulfo_patches = self.desulfo_locations[self.desulfo_mask, :].astype(np.int64)
+        for idx in range(desulfo_patches.shape[0]):
+            occupancy[tuple(desulfo_patches[idx])] += 1
+
+        clost_patches = self.clost_locations[self.clost_mask, :].astype(np.int64)
+        for idx in range(clost_patches.shape[0]):
+            occupancy[tuple(clost_patches[idx])] += 1
+
+        bacteroid_patches = self.bacteroid_locations[self.bacteroid_mask, :].astype(np.int64)
+        for idx in range(bacteroid_patches.shape[0]):
+            occupancy[tuple(bacteroid_patches[idx])] += 1
+
+        self.stuck_chance[:,:] = self.max_stuck_chance * ( 1- occupancy/(self.mid_stuck_conc + occupancy))
+        self.stuck_chance[self.stuck_chance < self.low_stuck_bound] = 0
