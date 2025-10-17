@@ -553,3 +553,649 @@ class GutPython:
             mode="constant",
             constant_values=False,
         )
+
+    ######################################################################
+    # Desulfovibro utility functions
+
+    def create_desulfo(
+        self,
+        *,
+        location: Optional[Iterable] = None,
+        theta: Optional[float] = None,
+        age: Optional[int] = None,
+        energy: Optional[float] = None,
+        excrete: Optional[bool] = None,
+        is_seed: Optional[bool] = None,
+        is_stuck: Optional[bool] = None,
+        rem_attempt: Optional[int] = None,
+    ) -> None:
+        """
+        Create a Desulfovibro.
+
+        :param location: location to create the desulfovibro (optional, random if omitted)
+        :param theta: direction of desulfovibro movement in radians (optional, random if omitted)
+        :param age:
+        :param rem_attempt:
+        :param is_stuck:
+        :param is_seed:
+        :param excrete:
+        :param energy:
+
+        :return:
+        """
+        if self.num_desulfos >= self.GRID_WIDTH * self.GRID_HEIGHT:
+            if VERBOSE:
+                print("Refusing to create a desulfovibro when there is no room for one.")
+            return
+
+        # make sure there is space
+        if self.desulfo_pointer >= self.MAX_DESULFOS:
+            self.compact_desulfo_arrays()
+            # maybe the array is already compacted:
+            if self.desulfo_pointer >= self.MAX_DESULFOS:
+                self._expand_desulfo_arrays()
+
+        if location is None:
+            self.desulfo_locations[self.desulfo_pointer, :] = np.array(
+                self.geometry
+            ) * np.random.rand(2)
+        else:
+            self.desulfo_locations[self.desulfo_pointer, :] = np.array(location).astype(np.float64)
+
+        if theta is None:
+            theta = 2 * np.pi * np.random.rand() - np.pi
+        else:
+            theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
+        self.desulfo_dirs[self.desulfo_pointer] = theta
+
+        self.desulfo_age[self.desulfo_pointer] = age
+        self.desulfo_energy[self.desulfo_pointer] = energy
+        self.desulfo_excrete[self.desulfo_pointer] = excrete
+        self.desulfo_is_seed[self.desulfo_pointer] = is_seed
+        self.desulfo_is_stuck[self.desulfo_pointer] = is_stuck
+        self.desulfo_rem_attempts[self.desulfo_pointer] = rem_attempt
+
+        self.desulfo_mask[self.desulfo_pointer] = True
+        self.num_desulfos += 1
+        self.desulfo_pointer += 1
+
+    def compact_desulfo_arrays(self):
+        self.desulfo_locations[: self.num_desulfos] = self.desulfo_locations[self.desulfo_mask]
+        self.desulfo_dirs[: self.num_desulfos] = self.desulfo_dirs[self.desulfo_mask]
+        self.desulfo_age[: self.num_desulfos] = self.desulfo_age[self.desulfo_mask]
+        self.desulfo_energy[: self.num_desulfos] = self.desulfo_energy[self.desulfo_mask]
+        self.desulfo_excrete[: self.num_desulfos] = self.desulfo_excrete[self.desulfo_mask]
+        self.desulfo_is_seed[: self.num_desulfos] = self.desulfo_is_seed[self.desulfo_mask]
+        self.desulfo_is_stuck[: self.num_desulfos] = self.desulfo_is_stuck[self.desulfo_mask]
+        self.desulfo_rem_attempts[: self.num_desulfos] = self.desulfo_rem_attempts[self.desulfo_mask]
+
+        self.desulfo_mask[: self.num_desulfos] = True
+        self.desulfo_mask[self.num_desulfos :] = False
+        self.desulfo_pointer = self.num_desulfos
+
+    def _expand_desulfo_arrays(self):
+        old_max_desulfos = self.MAX_DESULFOS
+        self.MAX_DESULFOS *= 2
+
+        self.desulfo_locations = np.pad(
+            self.desulfo_locations,
+            pad_width=np.array(((0, old_max_desulfos), (0, 0))),
+            mode="constant",
+            constant_values=(0, 0),
+        )
+        self.desulfo_dirs = np.pad(
+            self.desulfo_dirs,
+            pad_width=np.array((0, old_max_desulfos)),
+            mode="constant",
+            constant_values=0.0,
+        )
+        self.desulfo_age = np.pad(
+            self.desulfo_age,
+            pad_width=np.array((0, old_max_desulfos)),
+            mode="constant",
+            constant_values=0,
+        )
+        self.desulfo_energy = np.pad(
+            self.desulfo_energy,
+            pad_width=np.array((0, old_max_desulfos)),
+            mode="constant",
+            constant_values=0.0,
+        )
+        self.desulfo_excrete = np.pad(
+            self.desulfo_excrete,
+            pad_width=np.array((0, old_max_desulfos)),
+            mode="constant",
+            constant_values=False,
+        )
+        self.desulfo_is_seed = np.pad(
+            self.desulfo_is_seed,
+            pad_width=np.array((0, old_max_desulfos)),
+            mode="constant",
+            constant_values=False,
+        )
+        self.desulfo_is_stuck = np.pad(
+            self.desulfo_is_stuck,
+            pad_width=np.array((0, old_max_desulfos)),
+            mode="constant",
+            constant_values=False,
+        )
+        self.desulfo_rem_attempts = np.pad(
+            self.desulfo_rem_attempts,
+            pad_width=np.array((0, old_max_desulfos)),
+            mode="constant",
+            constant_values=0,
+        )
+        self.desulfo_mask = np.pad(
+            self.desulfo_mask,
+            pad_width=np.array((0, old_max_desulfos)),
+            mode="constant",
+            constant_values=False,
+        )
+
+    ######################################################################
+    # Clostridia utility functions
+
+    def create_clost(
+        self,
+        *,
+        location: Optional[Iterable] = None,
+        theta: Optional[float] = None,
+        age: Optional[int] = None,
+        energy: Optional[float] = None,
+        excrete: Optional[bool] = None,
+        is_seed: Optional[bool] = None,
+        is_stuck: Optional[bool] = None,
+        rem_attempt: Optional[int] = None,
+    ) -> None:
+        """
+        Create a Clostridium.
+
+        :param location: location to create the clostridium (optional, random if omitted)
+        :param theta: direction of clostridium movement in radians (optional, random if omitted)
+        :param age:
+        :param rem_attempt:
+        :param is_stuck:
+        :param is_seed:
+        :param excrete:
+        :param energy:
+
+        :return:
+        """
+        if self.num_closts >= self.GRID_WIDTH * self.GRID_HEIGHT:
+            if VERBOSE:
+                print("Refusing to create a clostridium when there is no room for one.")
+            return
+
+        # make sure there is space
+        if self.clost_pointer >= self.MAX_CLOSTS:
+            self.compact_clost_arrays()
+            # maybe the array is already compacted:
+            if self.clost_pointer >= self.MAX_CLOSTS:
+                self._expand_clost_arrays()
+
+        if location is None:
+            self.clost_locations[self.clost_pointer, :] = np.array(
+                self.geometry
+            ) * np.random.rand(2)
+        else:
+            self.clost_locations[self.clost_pointer, :] = np.array(location).astype(np.float64)
+
+        if theta is None:
+            theta = 2 * np.pi * np.random.rand() - np.pi
+        else:
+            theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
+        self.clost_dirs[self.clost_pointer] = theta
+
+        self.clost_age[self.clost_pointer] = age
+        self.clost_energy[self.clost_pointer] = energy
+        self.clost_excrete[self.clost_pointer] = excrete
+        self.clost_is_seed[self.clost_pointer] = is_seed
+        self.clost_is_stuck[self.clost_pointer] = is_stuck
+        self.clost_rem_attempts[self.clost_pointer] = rem_attempt
+
+        self.clost_mask[self.clost_pointer] = True
+        self.num_closts += 1
+        self.clost_pointer += 1
+
+    def compact_clost_arrays(self):
+        self.clost_locations[: self.num_closts] = self.clost_locations[self.clost_mask]
+        self.clost_dirs[: self.num_closts] = self.clost_dirs[self.clost_mask]
+        self.clost_age[: self.num_closts] = self.clost_age[self.clost_mask]
+        self.clost_energy[: self.num_closts] = self.clost_energy[self.clost_mask]
+        self.clost_excrete[: self.num_closts] = self.clost_excrete[self.clost_mask]
+        self.clost_is_seed[: self.num_closts] = self.clost_is_seed[self.clost_mask]
+        self.clost_is_stuck[: self.num_closts] = self.clost_is_stuck[self.clost_mask]
+        self.clost_rem_attempts[: self.num_closts] = self.clost_rem_attempts[self.clost_mask]
+
+        self.clost_mask[: self.num_closts] = True
+        self.clost_mask[self.num_closts :] = False
+        self.clost_pointer = self.num_closts
+
+    def _expand_clost_arrays(self):
+        old_max_closts = self.MAX_CLOSTS
+        self.MAX_CLOSTS *= 2
+
+        self.clost_locations = np.pad(
+            self.clost_locations,
+            pad_width=np.array(((0, old_max_closts), (0, 0))),
+            mode="constant",
+            constant_values=(0, 0),
+        )
+        self.clost_dirs = np.pad(
+            self.clost_dirs,
+            pad_width=np.array((0, old_max_closts)),
+            mode="constant",
+            constant_values=0.0,
+        )
+        self.clost_age = np.pad(
+            self.clost_age,
+            pad_width=np.array((0, old_max_closts)),
+            mode="constant",
+            constant_values=0,
+        )
+        self.clost_energy = np.pad(
+            self.clost_energy,
+            pad_width=np.array((0, old_max_closts)),
+            mode="constant",
+            constant_values=0.0,
+        )
+        self.clost_excrete = np.pad(
+            self.clost_excrete,
+            pad_width=np.array((0, old_max_closts)),
+            mode="constant",
+            constant_values=False,
+        )
+        self.clost_is_seed = np.pad(
+            self.clost_is_seed,
+            pad_width=np.array((0, old_max_closts)),
+            mode="constant",
+            constant_values=False,
+        )
+        self.clost_is_stuck = np.pad(
+            self.clost_is_stuck,
+            pad_width=np.array((0, old_max_closts)),
+            mode="constant",
+            constant_values=False,
+        )
+        self.clost_rem_attempts = np.pad(
+            self.clost_rem_attempts,
+            pad_width=np.array((0, old_max_closts)),
+            mode="constant",
+            constant_values=0,
+        )
+        self.clost_mask = np.pad(
+            self.clost_mask,
+            pad_width=np.array((0, old_max_closts)),
+            mode="constant",
+            constant_values=False,
+        )
+
+    ######################################################################
+    # Bacteroides utility functions
+
+    def create_bacteroid(
+        self,
+        *,
+        location: Optional[Iterable] = None,
+        theta: Optional[float] = None,
+        age: Optional[int] = None,
+        energy: Optional[float] = None,
+        excrete: Optional[bool] = None,
+        is_seed: Optional[bool] = None,
+        is_stuck: Optional[bool] = None,
+        rem_attempt: Optional[int] = None,
+    ) -> None:
+        """
+        Create a Bacteroides.
+
+        :param location: location to create the bacteroides (optional, random if omitted)
+        :param theta: direction of bacteroides movement in radians (optional, random if omitted)
+        :param age:
+        :param rem_attempt:
+        :param is_stuck:
+        :param is_seed:
+        :param excrete:
+        :param energy:
+
+        :return:
+        """
+        if self.num_bacteroids >= self.GRID_WIDTH * self.GRID_HEIGHT:
+            if VERBOSE:
+                print("Refusing to create a bacteroides when there is no room for one.")
+            return
+
+        # make sure there is space
+        if self.bacteroid_pointer >= self.MAX_BACTEROIDS:
+            self.compact_bacteroid_arrays()
+            # maybe the array is already compacted:
+            if self.bacteroid_pointer >= self.MAX_BACTEROIDS:
+                self._expand_bacteroid_arrays()
+
+        if location is None:
+            self.bacteroid_locations[self.bacteroid_pointer, :] = np.array(
+                self.geometry
+            ) * np.random.rand(2)
+        else:
+            self.bacteroid_locations[self.bacteroid_pointer, :] = np.array(location).astype(np.float64)
+
+        if theta is None:
+            theta = 2 * np.pi * np.random.rand() - np.pi
+        else:
+            theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
+        self.bacteroid_dirs[self.bacteroid_pointer] = theta
+
+        self.bacteroid_age[self.bacteroid_pointer] = age
+        self.bacteroid_energy[self.bacteroid_pointer] = energy
+        self.bacteroid_excrete[self.bacteroid_pointer] = excrete
+        self.bacteroid_is_seed[self.bacteroid_pointer] = is_seed
+        self.bacteroid_is_stuck[self.bacteroid_pointer] = is_stuck
+        self.bacteroid_rem_attempts[self.bacteroid_pointer] = rem_attempt
+
+        self.bacteroid_mask[self.bacteroid_pointer] = True
+        self.num_bacteroids += 1
+        self.bacteroid_pointer += 1
+
+    def compact_bacteroid_arrays(self):
+        self.bacteroid_locations[: self.num_bacteroids] = self.bacteroid_locations[self.bacteroid_mask]
+        self.bacteroid_dirs[: self.num_bacteroids] = self.bacteroid_dirs[self.bacteroid_mask]
+        self.bacteroid_age[: self.num_bacteroids] = self.bacteroid_age[self.bacteroid_mask]
+        self.bacteroid_energy[: self.num_bacteroids] = self.bacteroid_energy[self.bacteroid_mask]
+        self.bacteroid_excrete[: self.num_bacteroids] = self.bacteroid_excrete[self.bacteroid_mask]
+        self.bacteroid_is_seed[: self.num_bacteroids] = self.bacteroid_is_seed[self.bacteroid_mask]
+        self.bacteroid_is_stuck[: self.num_bacteroids] = self.bacteroid_is_stuck[self.bacteroid_mask]
+        self.bacteroid_rem_attempts[: self.num_bacteroids] = self.bacteroid_rem_attempts[self.bacteroid_mask]
+
+        self.bacteroid_mask[: self.num_bacteroids] = True
+        self.bacteroid_mask[self.num_bacteroids :] = False
+        self.bacteroid_pointer = self.num_bacteroids
+
+    def _expand_bacteroid_arrays(self):
+        old_max_bacteroids = self.MAX_BACTEROIDS
+        self.MAX_BACTEROIDS *= 2
+
+        self.bacteroid_locations = np.pad(
+            self.bacteroid_locations,
+            pad_width=np.array(((0, old_max_bacteroids), (0, 0))),
+            mode="constant",
+            constant_values=(0, 0),
+        )
+        self.bacteroid_dirs = np.pad(
+            self.bacteroid_dirs,
+            pad_width=np.array((0, old_max_bacteroids)),
+            mode="constant",
+            constant_values=0.0,
+        )
+        self.bacteroid_age = np.pad(
+            self.bacteroid_age,
+            pad_width=np.array((0, old_max_bacteroids)),
+            mode="constant",
+            constant_values=0,
+        )
+        self.bacteroid_energy = np.pad(
+            self.bacteroid_energy,
+            pad_width=np.array((0, old_max_bacteroids)),
+            mode="constant",
+            constant_values=0.0,
+        )
+        self.bacteroid_excrete = np.pad(
+            self.bacteroid_excrete,
+            pad_width=np.array((0, old_max_bacteroids)),
+            mode="constant",
+            constant_values=False,
+        )
+        self.bacteroid_is_seed = np.pad(
+            self.bacteroid_is_seed,
+            pad_width=np.array((0, old_max_bacteroids)),
+            mode="constant",
+            constant_values=False,
+        )
+        self.bacteroid_is_stuck = np.pad(
+            self.bacteroid_is_stuck,
+            pad_width=np.array((0, old_max_bacteroids)),
+            mode="constant",
+            constant_values=False,
+        )
+        self.bacteroid_rem_attempts = np.pad(
+            self.bacteroid_rem_attempts,
+            pad_width=np.array((0, old_max_bacteroids)),
+            mode="constant",
+            constant_values=0,
+        )
+        self.bacteroid_mask = np.pad(
+            self.bacteroid_mask,
+            pad_width=np.array((0, old_max_bacteroids)),
+            mode="constant",
+            constant_values=False,
+        )
+
+    ######################################################################
+    # initialization code
+
+    def __attrs_post_init__(self):
+        self.setup()
+
+    def setup(self):
+        #   create-bifidos (initNumBifidos * (1 - seedPercent / 100)) [
+        #     ;;create non-seeds
+        #     set color blue
+        #     set size 0.25
+        #     set label-color blue - 2
+        #     set energy 100
+        #     set excrete false
+        #     set isSeed false
+        #     set isStuck true
+        #     set age random 1000
+        # 	  set flowConst 1 ;; can use this to edit the breed specfic flow distance
+        # 	  set doubConst 1
+        #     setxy random-xcor random-ycor
+        #   ]
+        #   create-bifidos (initNumBifidos * (seedPercent / 100)) [
+        #     ;;create seeds
+        #     set color blue
+        #     set size 0.25
+        #     set label-color blue - 2
+        #     set energy 100
+        #     set excrete false
+        #     set isSeed true
+        #     set isStuck true
+        #     set age random 1000
+        # 	  set flowConst 1 ;; can use this to edit the breed specfic flow distance
+        # 	  set doubConst 1
+        #     setxy random-xcor random-ycor
+        #   ]
+        self.num_bifidos = 0
+        self.bifido_pointer = 0
+        self.bifido_mask[:] = False
+        num_seed_bifidos = int(self.init_num_bifidos * self.seed_percent/100)
+        for idx in range(self.init_num_bifidos):
+            self.create_bifido(
+                energy=100,
+                excrete=False,
+                is_seed=idx < num_seed_bifidos,
+                is_stuck=True,
+                age=np.random.randint(1000),
+
+            )
+
+        # create-desulfos (initNumDesulfos * (1 - seedPercent / 100)) [
+        #     ;;create non-seeds
+        #     set color green
+        #     set size 0.25
+        #     set energy 100
+        #     set excrete false
+        #     set isSeed false
+        #     set isStuck true
+        # 	  set age random 1000
+        # 	  set flowConst 1
+        # 	  set doubConst 1
+        #     setxy random-xcor random-ycor
+        #   ]
+        #
+        #   create-desulfos (initNumDesulfos * (seedPercent / 100)) [
+        #     ;;create seeds
+        #     set color green
+        #     set size 0.25
+        #     set energy 100
+        #     set excrete false
+        #     set isSeed true
+        #     set isStuck true
+        # 	  set age random 1000
+        # 	  set flowConst 1
+        # 	  set doubConst 1
+        #     setxy random-xcor random-ycor
+        #   ]
+        self.num_desulfos = 0
+        self.desulfo_pointer = 0
+        self.desulfo_mask[:] = False
+        num_seed_desulfos = int(self.init_num_desulfos * self.seed_percent / 100)
+        for idx in range(self.init_num_desulfos):
+            self.create_desulfo(
+                energy=100,
+                excrete=False,
+                is_seed=idx < num_seed_desulfos,
+                is_stuck=True,
+                age=np.random.randint(1000),
+            )
+
+        # create-closts (initNumClosts * (1 - seedPercent / 100)) [
+        #     ;;create non-seeds
+        #     set color red
+        #     set size 0.25
+        #     set energy 100
+        #     set excrete false
+        #     set isSeed false
+        #     set isStuck true
+        # 	  set age random 1000
+        # 	  set flowConst 1
+        # 	  set doubConst 1
+        #     setxy random-xcor random-ycor
+        #   ]
+        #
+        #     create-closts (initNumClosts * (seedPercent / 100)) [
+        #     ;;create seeds
+        #     set color red
+        #     set size 0.25
+        #     set energy 100
+        #     set excrete false
+        #     set isSeed true
+        #     set isStuck true
+        # 	  set age random 1000
+        # 	  set flowConst 1
+        # 	  set doubConst 1
+        #     setxy random-xcor random-ycor
+        #   ]
+        self.num_closts= 0
+        self.clost_pointer = 0
+        self.clost_mask[:] = False
+        num_seed_closts = int(self.init_num_closts * self.seed_percent / 100)
+        for idx in range(self.init_num_closts):
+            self.create_clost(
+                energy=100,
+                excrete=False,
+                is_seed=idx < num_seed_closts,
+                is_stuck=True,
+                age=np.random.randint(1000),
+            )
+
+        # create-bacteroides (initNumBacteroides * (1 - seedPercent / 100)) [
+        #     ;;create non-seeds
+        #     set color grey
+        #     set size 0.25
+        #     set energy 100
+        #     set excrete false
+        #     set isSeed false
+        #     set isStuck true
+        # 	  set age random 1000
+        # 	  set flowConst 1
+        # 	  set doubConst 1
+        #     setxy random-xcor random-ycor
+        #   ]
+        #
+        #   create-bacteroides (initNumBacteroides * (seedPercent / 100)) [
+        #     ;;create seeds
+        #     set color grey
+        #     set size 0.25
+        #     set energy 100
+        #     set excrete false
+        #     set isSeed true
+        #     set isStuck true
+        # 	  set age random 1000
+        # 	  set flowConst 1
+        # 	  set doubConst 1
+        #     setxy random-xcor random-ycor
+        #   ]
+        self.num_bacteroids = 0
+        self.bacteroid_pointer = 0
+        self.bacteroid_mask[:] = False
+        num_seed_bacteroids = int(self.init_num_bacteroids * self.seed_percent / 100)
+        for idx in range(self.init_num_bacteroids):
+            self.create_bacteroid(
+                energy=100,
+                excrete=False,
+                is_seed=idx < num_seed_bacteroids,
+                is_stuck=True,
+                age=np.random.randint(1000),
+            )
+
+        # ;; initializes the patch variables
+        #   ask patches [
+        #     set glucose 0
+        #     set FO 0
+        #     set lactose 0
+        #     set lactate 0
+        #     set inulin 0
+        #     set CS 0
+        #     set glucosePrev 0
+        #     set FOPrev 0
+        #     set lactosePrev 0
+        #     set lactatePrev 0
+        #     set inulinPrev 0
+        #     set CSPrev 0
+        #     set glucoseReserve 0
+        #     set FOReserve 0
+        #     set lactoseReserve 0
+        #     set lactateReserve 0
+        #     set inulinReserve 0
+        #     set CSReserve 0
+        #     set stuckChance 0
+        #   ]
+
+        self.glucose[:,:] = 0.0
+        self.fo[:,:] = 0.0
+        self.lactose[:,:] = 0.0
+        self.lactate[:,:] = 0.0
+        self.inulin[:,:] = 0.0
+        self.cs[:,:] = 0.0
+        self.glucose_prev[:,:] = 0.0
+        self.fo_prev[:,:] = 0.0
+        self.lactose_prev[:,:] = 0.0
+        self.lactate_prev[:,:] = 0.0
+        self.inulin_prev[:,:] = 0.0
+        self.cs_prev[:,:] = 0.0
+        self.glucose_reserve[:,:] = 0.0
+        self.fo_reserve[:,:] = 0.0
+        self.lactose_reserve[:,:] = 0.0
+        self.lactate_reserve[:,:] = 0.0
+        self.inulin_reserve[:,:] = 0.0
+        self.cs_reserve[:,:] = 0.0
+        self.stuck_chance[:,:] = 0.0
+
+        #   ;; setup the true absorption rate
+        #   setTrueAbs
+
+        # TODO
+
+        #   ;; setup the stuckChance
+        #   setStuckChance
+
+        # TODO
+
+        #   ;; Setup for stop if negative metas
+        #   set negMeta false
+
+        # TODO
+
+        #   ;; set time to zero
+        #   reset-ticks
+
+        # TODO
