@@ -23,6 +23,26 @@ class GutPython:
     #   ]
 
     ######################################################################
+    # parameters from interface
+
+    max_stuck_chance: float = field(default=50)  # TODO: understand units. percent?
+    low_stuck_bound: float = field(default=2)  # TODO: understand units. percent?
+    unstuck_chance: float = field(default=10)  # TODO: understand units. percent?
+    mid_stuck_conc: float = field(default=10.0)  # TODO: understand units. percent?
+    seed_chance: float = field(default=5.0)  # TODO: understand units. percent?
+    seed_percent: float = field(default=5.0)
+
+    init_num_bifidos: int = field(default=23562)  # TODO: uhh? Seems awfully specific.
+    init_num_bacteroids: int = field(default=5490)  # TODO: uhh? Seems awfully specific.
+    init_num_closts: int = field(default=921)  # TODO: uhh? Seems awfully specific.
+    init_num_desulfos: int = field(default=70)
+
+    ######################################################################
+    # other globals
+
+    neg_meta: bool = False
+
+    ######################################################################
     # static properties
 
     @property
@@ -219,7 +239,7 @@ class GutPython:
         return np.zeros(self.MAX_CLOSTS, dtype=np.float64)
 
     ######################################################################
-    # bacteriodes
+    # bacteroides
 
     bacteroid_doub_const: float = field(default=1.0)
     bacteroid_flow_const: float = field(default=1.0)
@@ -627,7 +647,9 @@ class GutPython:
         self.desulfo_excrete[: self.num_desulfos] = self.desulfo_excrete[self.desulfo_mask]
         self.desulfo_is_seed[: self.num_desulfos] = self.desulfo_is_seed[self.desulfo_mask]
         self.desulfo_is_stuck[: self.num_desulfos] = self.desulfo_is_stuck[self.desulfo_mask]
-        self.desulfo_rem_attempts[: self.num_desulfos] = self.desulfo_rem_attempts[self.desulfo_mask]
+        self.desulfo_rem_attempts[: self.num_desulfos] = self.desulfo_rem_attempts[
+            self.desulfo_mask
+        ]
 
         self.desulfo_mask[: self.num_desulfos] = True
         self.desulfo_mask[self.num_desulfos :] = False
@@ -734,9 +756,9 @@ class GutPython:
                 self._expand_clost_arrays()
 
         if location is None:
-            self.clost_locations[self.clost_pointer, :] = np.array(
-                self.geometry
-            ) * np.random.rand(2)
+            self.clost_locations[self.clost_pointer, :] = np.array(self.geometry) * np.random.rand(
+                2
+            )
         else:
             self.clost_locations[self.clost_pointer, :] = np.array(location).astype(np.float64)
 
@@ -876,7 +898,9 @@ class GutPython:
                 self.geometry
             ) * np.random.rand(2)
         else:
-            self.bacteroid_locations[self.bacteroid_pointer, :] = np.array(location).astype(np.float64)
+            self.bacteroid_locations[self.bacteroid_pointer, :] = np.array(location).astype(
+                np.float64
+            )
 
         if theta is None:
             theta = 2 * np.pi * np.random.rand() - np.pi
@@ -896,14 +920,20 @@ class GutPython:
         self.bacteroid_pointer += 1
 
     def compact_bacteroid_arrays(self):
-        self.bacteroid_locations[: self.num_bacteroids] = self.bacteroid_locations[self.bacteroid_mask]
+        self.bacteroid_locations[: self.num_bacteroids] = self.bacteroid_locations[
+            self.bacteroid_mask
+        ]
         self.bacteroid_dirs[: self.num_bacteroids] = self.bacteroid_dirs[self.bacteroid_mask]
         self.bacteroid_age[: self.num_bacteroids] = self.bacteroid_age[self.bacteroid_mask]
         self.bacteroid_energy[: self.num_bacteroids] = self.bacteroid_energy[self.bacteroid_mask]
         self.bacteroid_excrete[: self.num_bacteroids] = self.bacteroid_excrete[self.bacteroid_mask]
         self.bacteroid_is_seed[: self.num_bacteroids] = self.bacteroid_is_seed[self.bacteroid_mask]
-        self.bacteroid_is_stuck[: self.num_bacteroids] = self.bacteroid_is_stuck[self.bacteroid_mask]
-        self.bacteroid_rem_attempts[: self.num_bacteroids] = self.bacteroid_rem_attempts[self.bacteroid_mask]
+        self.bacteroid_is_stuck[: self.num_bacteroids] = self.bacteroid_is_stuck[
+            self.bacteroid_mask
+        ]
+        self.bacteroid_rem_attempts[: self.num_bacteroids] = self.bacteroid_rem_attempts[
+            self.bacteroid_mask
+        ]
 
         self.bacteroid_mask[: self.num_bacteroids] = True
         self.bacteroid_mask[self.num_bacteroids :] = False
@@ -985,7 +1015,7 @@ class GutPython:
         #     set isSeed false
         #     set isStuck true
         #     set age random 1000
-        # 	  set flowConst 1 ;; can use this to edit the breed specfic flow distance
+        # 	  set flowConst 1 ;; can use this to edit the breed specific flow distance
         # 	  set doubConst 1
         #     setxy random-xcor random-ycor
         #   ]
@@ -999,14 +1029,14 @@ class GutPython:
         #     set isSeed true
         #     set isStuck true
         #     set age random 1000
-        # 	  set flowConst 1 ;; can use this to edit the breed specfic flow distance
+        # 	  set flowConst 1 ;; can use this to edit the breed specific flow distance
         # 	  set doubConst 1
         #     setxy random-xcor random-ycor
         #   ]
         self.num_bifidos = 0
         self.bifido_pointer = 0
         self.bifido_mask[:] = False
-        num_seed_bifidos = int(self.init_num_bifidos * self.seed_percent/100)
+        num_seed_bifidos = int(self.init_num_bifidos * self.seed_percent / 100)
         for idx in range(self.init_num_bifidos):
             self.create_bifido(
                 energy=100,
@@ -1014,7 +1044,6 @@ class GutPython:
                 is_seed=idx < num_seed_bifidos,
                 is_stuck=True,
                 age=np.random.randint(1000),
-
             )
 
         # create-desulfos (initNumDesulfos * (1 - seedPercent / 100)) [
@@ -1084,7 +1113,7 @@ class GutPython:
         # 	  set doubConst 1
         #     setxy random-xcor random-ycor
         #   ]
-        self.num_closts= 0
+        self.num_closts = 0
         self.clost_pointer = 0
         self.clost_mask[:] = False
         num_seed_closts = int(self.init_num_closts * self.seed_percent / 100)
@@ -1160,30 +1189,30 @@ class GutPython:
         #     set stuckChance 0
         #   ]
 
-        self.glucose[:,:] = 0.0
-        self.fo[:,:] = 0.0
-        self.lactose[:,:] = 0.0
-        self.lactate[:,:] = 0.0
-        self.inulin[:,:] = 0.0
-        self.cs[:,:] = 0.0
-        self.glucose_prev[:,:] = 0.0
-        self.fo_prev[:,:] = 0.0
-        self.lactose_prev[:,:] = 0.0
-        self.lactate_prev[:,:] = 0.0
-        self.inulin_prev[:,:] = 0.0
-        self.cs_prev[:,:] = 0.0
-        self.glucose_reserve[:,:] = 0.0
-        self.fo_reserve[:,:] = 0.0
-        self.lactose_reserve[:,:] = 0.0
-        self.lactate_reserve[:,:] = 0.0
-        self.inulin_reserve[:,:] = 0.0
-        self.cs_reserve[:,:] = 0.0
-        self.stuck_chance[:,:] = 0.0
+        self.glucose[:, :] = 0.0
+        self.fo[:, :] = 0.0
+        self.lactose[:, :] = 0.0
+        self.lactate[:, :] = 0.0
+        self.inulin[:, :] = 0.0
+        self.cs[:, :] = 0.0
+        self.glucose_prev[:, :] = 0.0
+        self.fo_prev[:, :] = 0.0
+        self.lactose_prev[:, :] = 0.0
+        self.lactate_prev[:, :] = 0.0
+        self.inulin_prev[:, :] = 0.0
+        self.cs_prev[:, :] = 0.0
+        self.glucose_reserve[:, :] = 0.0
+        self.fo_reserve[:, :] = 0.0
+        self.lactose_reserve[:, :] = 0.0
+        self.lactate_reserve[:, :] = 0.0
+        self.inulin_reserve[:, :] = 0.0
+        self.cs_reserve[:, :] = 0.0
+        self.stuck_chance[:, :] = 0.0
 
         #   ;; setup the true absorption rate
         #   setTrueAbs
 
-        # TODO
+        self.set_true_abs()
 
         #   ;; setup the stuckChance
         #   setStuckChance
@@ -1193,17 +1222,39 @@ class GutPython:
         #   ;; Setup for stop if negative metas
         #   set negMeta false
 
-        # TODO
+        self.neg_meta = False
 
         #   ;; set time to zero
         #   reset-ticks
 
         # TODO
 
+        #   ;; reset the testState
+        #   set testState 0
+
+    def set_true_abs(self):
+        # to setTrueAbs
+        #   ;; controls the true absorption rate
+        #
+        #   ;; 0.723823204 is the weighted average immune response coefficient calculated for
+        #   ;; Healthy bacteria gut percentages. This allows the absorption to change due to
+        #   ;; bacteria populations, simulating immune response.
+        #
+        # 	ifelse (any? turtles)[
+        #   	set trueAbsorption absorption * (0.723823204 / ((0.8 * ((count desulfos) / (count turtles))) +
+        #   	(1 * ((count closts) / (count turtles)))+(1.2 * ((count bacteroides) / (count turtles))) +
+        #   	(0.7 * ((count bifidos) / (count turtles)))))
+        # 	][
+        # 		set trueAbsorption 0
+        # print "ERROR! Bacteria died out. Problem with simulation leading to inaccurate results. Terminating Program."
+        # 	]
+        # end
+        pass
+
     def set_stuck_chance(self):
         occupancy = np.zeros(self.geometry, dtype=np.int64)
 
-        bifido_patches = self.bifido_locations[self.bifido_mask,:].astype(np.int64)
+        bifido_patches = self.bifido_locations[self.bifido_mask, :].astype(np.int64)
         # TODO: vectorize. need to check what happens with repeat locs using
         #  occupancy[tuple(bifido_patches.T)] += 1
         for idx in range(bifido_patches.shape[0]):
@@ -1221,5 +1272,7 @@ class GutPython:
         for idx in range(bacteroid_patches.shape[0]):
             occupancy[tuple(bacteroid_patches[idx])] += 1
 
-        self.stuck_chance[:,:] = self.max_stuck_chance * ( 1- occupancy/(self.mid_stuck_conc + occupancy))
+        self.stuck_chance[:, :] = self.max_stuck_chance * (
+            1 - occupancy / (self.mid_stuck_conc + occupancy)
+        )
         self.stuck_chance[self.stuck_chance < self.low_stuck_bound] = 0
