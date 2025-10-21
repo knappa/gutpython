@@ -1,7 +1,8 @@
-from typing import Iterable, Optional, Tuple
+from typing import Final, Iterable, Optional, Tuple
 
+import h5py
 import numpy as np
-from attr import define, field
+from attr import define, field, fields
 
 BIG_NUM = 3000
 MEDIUM_NUM = 200
@@ -32,15 +33,27 @@ class GutPython:
     seed_chance: float = field(default=5.0)  # TODO: understand units. percent?
     seed_percent: float = field(default=5.0)
 
+    absorption: float = field(default=0.0)  # TODO: understand units.
+    reserve_fraction: float = field(default=0.0)  # TODO: understand units.
+
     init_num_bifidos: int = field(default=23562)  # TODO: uhh? Seems awfully specific.
     init_num_bacteroids: int = field(default=5490)  # TODO: uhh? Seems awfully specific.
     init_num_closts: int = field(default=921)  # TODO: uhh? Seems awfully specific.
     init_num_desulfos: int = field(default=70)
 
     ######################################################################
+    # hidden parameters (magic constants)
+
+    absorption_constant: Final[float] = 0.723823204
+
+    ######################################################################
     # other globals
 
+    true_absorption: float = field(default=0.0)  # TODO: understand units.
+
     neg_meta: bool = False
+    test_state: int = 0
+    ticks: int = 0
 
     ######################################################################
     # static properties
@@ -50,13 +63,20 @@ class GutPython:
         return self.GRID_HEIGHT, self.GRID_WIDTH
 
     ######################################################################
+    # dynamic properties
+
+    @property
+    def num_bacteria(self):
+        return self.num_closts + self.num_bifidos + self.num_bacteroids + self.num_bacteroids
+
+    ######################################################################
     # bifidobacteria
 
     bifido_doub_const: float = field(default=1.0)
     bifido_flow_const: float = field(default=1.0)
 
-    num_bifidos: int = field(init=False, factory=lambda: 0, type=int)
-    bifido_pointer: int = field(init=False, factory=lambda: 0, type=int)
+    num_bifidos: int = field(init=False, factory=lambda: 0)
+    bifido_pointer: int = field(init=False, factory=lambda: 0)
 
     bifido_mask = field(type=np.ndarray)
 
@@ -118,8 +138,8 @@ class GutPython:
     desulfo_doub_const: float = field(default=1.0)
     desulfo_flow_const: float = field(default=1.0)
 
-    num_desulfos: int = field(init=False, factory=lambda: 0, type=int)
-    desulfo_pointer: int = field(init=False, factory=lambda: 0, type=int)
+    num_desulfos: int = field(init=False, factory=lambda: 0)
+    desulfo_pointer: int = field(init=False, factory=lambda: 0)
 
     desulfo_mask = field(type=np.ndarray)
 
@@ -181,8 +201,8 @@ class GutPython:
     clost_doub_const: float = field(default=1.0)
     clost_flow_const: float = field(default=1.0)
 
-    num_closts: int = field(init=False, factory=lambda: 0, type=int)
-    clost_pointer: int = field(init=False, factory=lambda: 0, type=int)
+    num_closts: int = field(init=False, factory=lambda: 0)
+    clost_pointer: int = field(init=False, factory=lambda: 0)
 
     clost_mask = field(type=np.ndarray)
 
@@ -244,8 +264,8 @@ class GutPython:
     bacteroid_doub_const: float = field(default=1.0)
     bacteroid_flow_const: float = field(default=1.0)
 
-    num_bacteroids: int = field(init=False, factory=lambda: 0, type=int)
-    bacteroid_pointer: int = field(init=False, factory=lambda: 0, type=int)
+    num_bacteroids: int = field(init=False, factory=lambda: 0)
+    bacteroid_pointer: int = field(init=False, factory=lambda: 0)
 
     bacteroid_mask = field(type=np.ndarray)
 
@@ -999,6 +1019,97 @@ class GutPython:
         )
 
     ######################################################################
+    # saving and loading the model state
+
+    def save(self, filename: str, *, write_mode: str = "a"):
+        """
+        Record the model state to an HDF5 file.
+        :param filename:
+        :param write_mode: e.g. append, write
+        :return:
+        """
+        # compute which class attributes should be saved
+        rep = {attr: getattr(self, attr) for attr in dir(self) if attr[0] != "_"}
+        rep = {k: v for k, v in rep.items() if isinstance(v, (int, float, bool, np.ndarray))}
+
+        with h5py.File(filename, write_mode) as f:
+            grp: h5py.Group = f.create_group(str(self.ticks))
+            skip_list = set.union(
+                *[
+                    {f"num_{spec}s", f"{spec}_pointer", f"{spec}_mask"}
+                    for spec in ["bifido", "bacteroid", "clost", "desulfo"]
+                ]
+            )
+            for k, v in rep.items():
+                # skip things that can be automatically reconstructed
+                if k in skip_list:
+                    continue
+
+                if isinstance(v, (int, float, bool)):
+                    # grp.create_dataset(k, shape=(), dtype=type(v), data=v, compression="gz")
+                    grp.create_dataset(k, shape=(), dtype=type(v), data=v)
+                else:
+                    # numpy array
+                    if np.issubdtype(v.dtype, np.object_):
+                        v = v.astype(int)
+                    for bact_type in ["bifido", "bacteroid", "clost", "desulfo"]:
+                        if k.startswith(bact_type):
+                            v = v[getattr(self, f"{bact_type}_mask")]
+                            break
+                    grp.create_dataset(k, shape=v.shape, dtype=v.dtype, data=v, compression="gz")
+
+    @classmethod
+    def load(cls, filename: str, time: int) -> "GutPython":
+        """
+        Instantiate the model from an HDF5 file.
+        :param filename:
+        :param time: which time slice to load from
+        :return:
+        """
+        cell_types = ["bifido", "bacteroid", "clost", "desulfo"]
+        non_cell_init_fields = [
+            f
+            for f in fields(cls)
+            if f.init and not any(f.name.beginswith(cell_type) for cell_type in cell_types)
+        ]
+        cell_init_fields = [
+            f
+            for f in fields(cls)
+            if f.init and any(f.name.beginswith(cell_type) for cell_type in cell_types)
+        ]
+
+        with h5py.File(filename, "r+") as f:
+            grp: h5py.Group = f[str(time)]
+            model = cls(
+                **{f: grp[f][()] for f in non_cell_init_fields},
+            )
+
+            # scalars not initialized by init
+            model.ticks = grp["time"][()]
+
+            num_cells = {
+                cell_type: grp[f"{cell_type}_locations"].shape[0] for cell_type in cell_types
+            }
+            # ensure there is enough space
+            for cell_type in cell_types:
+                if num_cells[cell_type] > getattr(model, f"{cell_type}_mask").size:
+                    getattr(model, f"_expand_{cell_type}_arrays")()
+
+            for field in cell_init_fields:
+                cell_type = field.split("_")[0]
+                model_field = getattr(model, field)
+                model_field[: num_cells[cell_type]] = grp[field][()]
+
+            for cell_type in cell_types:
+                setattr(model, f"num_{cell_type}", num_cells[cell_type])
+                setattr(model, f"{cell_type}_pointer", num_cells[cell_type])
+                cell_mask = getattr(model, f"{cell_type}_mask")
+                cell_mask[: num_cells[cell_type]] = True
+                cell_mask[num_cells[cell_type] :] = False
+
+        return model
+
+    ######################################################################
     # initialization code
 
     def __attrs_post_init__(self):
@@ -1227,10 +1338,410 @@ class GutPython:
         #   ;; set time to zero
         #   reset-ticks
 
-        # TODO
+        self.ticks = 0
 
         #   ;; reset the testState
         #   set testState 0
+
+        self.test_state = 0
+
+    def go(self):
+        # to go
+        # ;; This function determines the behavior at each time tick
+        #
+        #   ;; stop if error or unexpected output
+        #   stopCheck
+
+        self.stop_check()
+
+        #   ;; Modify the energy level of each turtle and metabolite level of each patch
+        #   ask patches [
+        #     patchEat
+        #     storeMetabolites
+        #   ]
+
+        self.patch_eat()
+        self.store_metabolites()
+
+        #   ;; make meta must be in seperate ask, sequential tasks
+        #   ask patches[
+        #     makeMetabolites
+        #   ]
+
+        self.make_metabolites()
+
+        #   ;; agents do their other procedures for this tick
+        #   bactTickBehavior
+
+        self.bact_tick_behavior()
+
+        #   ;; set the new stuckChance for the patches
+        #   setStuckChance
+
+        self.set_stuck_chance()
+
+        #   ;; change the trueAbsorption
+        #   setTrueAbs
+
+        self.set_true_abs()
+
+        #   ;; make agents into seeds
+        #   createSeeds
+
+        self.create_seeds()
+
+        #   ;; Probiotics or bacteria in
+        #   bactIn
+
+        self.bact_in()
+
+        #   ;; Increment time
+        #   tick
+
+        self.ticks += 1
+
+        # end
+
+    def stop_check(self):
+        # to stopCheck
+        # ;; code for stopping the simulation on unexpected output
+        #
+        #   ;; Stop if negative number of metas calculated
+        #   if negMeta [stop]
+        #
+        #   ;; Stop if any population hits 0 or there are too many turtles
+        #   if (count turtles > 1000000) [ stop ]
+        #   if not any? turtles [ stop ] ;; stop if all turtles are dead
+        # end
+        if self.neg_meta:
+            exit()
+        if self.num_bacteria > 1000000:
+            exit()
+        if self.num_bacteria <= 0:
+            exit()
+        # TODO: implement better signalling than an immediate exit.
+
+    def patch_eat(self):
+        # to patchEat
+        # ;; run this on a ask patches to have them start the turtle eating process
+        #   ask turtles-here [
+        #     set remAttempts 2 ;; reset the number of attempts
+        #     set energy (energy - (100 / 1440)) ;; decrease the energy of the bacteria, currently survive 24 hours no eat
+        #   ]
+        #   let allMetas (list CS FO glucose inulin lactate lactose);; list containing numbers of all the metas
+        #   set avaMetas []
+        #
+        #   ;; initialize the two lists
+        #   let hungryBact (turtles-here with [(energy < 80) and (remAttempts > 0)])
+        #   let i 0
+        #   while [i < (length(allMetas))][
+        #     if (item i allMetas >= 1) [
+        #       set avaMetas lput (i + 10) avaMetas
+        #     ]
+        #     set i (i + 1)
+        #   ]
+        #   let iter 0 ;; used to limit the number of times the next while loop will occur, aribitrary
+        #   ;; do the eating till no metas or not hungry
+        #   while [(length(avaMetas) > 0) and any? hungryBact and iter < 100] [
+        #     ;; code here to randomly select a turtle from hungryBact and then ask it to run bactEat with a random meta from ava. list
+        #     ask one-of hungryBact [
+        #       bactEat(one-of avaMetas)
+        #       set remAttempts remAttempts - 1
+        #     ]
+        #     ;;re-bound agent set
+        #     set hungryBact (turtles-here with [(energy < 80) and (remAttempts > 0)])
+        #
+        #     set iter (iter + 1)
+        #   ]
+        # end
+        pass
+        # TODO: implement
+
+    def store_metabolites(self):
+        # to storeMetabolites
+        # ;; Sets previous metaohydrate variables to current levels to allow for correct
+        # ;; transfer on ticks
+        #   set inulinPrev ((inulin + inulinReserve))
+        #   set FOPrev ((FO + FOReserve))
+        #   set lactosePrev ((lactose + lactoseReserve))
+        #   set lactatePrev ((lactate + lactateReserve))
+        #   set glucosePrev ((glucose + glucoseReserve))
+        #   set CSPrev ((CS + CSReserve))
+        # end
+        self.inulin_prev[:, :] = self.inulin + self.inulin_reserve
+        self.fo_prev[:, :] = self.fo + self.fo_reserve
+        self.lactose_prev[:, :] = self.lactose + self.lactose_reserve
+        self.lactate_prev[:, :] = self.lactate + self.lactate_reserve
+        self.glucose_prev[:, :] = self.glucose + self.glucose_reserve
+        self.cs_prev[:, :] = self.cs + self.cs_reserve
+
+    def make_metabolites(self):
+        # to makeMetabolites
+        # ;; Runs through all the metabolites and makes them, and moves them.
+        #   let frac (flowDist - (floor( flowDist )))
+        #
+        #   let span ((max-pycor - min-pycor) + 1)
+        #
+        #   let leftDist (pxcor - min-pxcor)
+        #
+        #   if ((inulin < 0) or (CS < 0) or (FO < 0) or (lactose < 0) or (lactate < 0) or (glucose < 0)) [
+        #     print "ERROR! Patch reported negative metabolite. Problem with simulation leading to inaccurate results. Terminating Program."
+        #     set negMeta true
+        #     stop
+        #   ]
+        #
+        #   set inulin ((inulin) + inulinReserve)
+        #   set FO ((FO) + FOReserve)
+        #   set lactose ((lactose) + lactoseReserve)
+        #   set lactate ((lactate) + lactateReserve)
+        #   set glucose ((glucose) + glucoseReserve)
+        #   set CS ((CS) + CSReserve)
+        #
+        #   let remainFactor 0
+        #   if (flowDist < 1)[set remainFactor (1 - flowDist)]
+        #   set inulin (inulin * remainFactor)
+        #   set FO (FO * remainFactor)
+        #   set lactose (lactose * remainFactor)
+        #   set lactate (lactate * remainFactor)
+        #   set glucose (glucose * remainFactor)
+        #   set CS (CS * remainFactor)
+        #
+        #   ;;The leftmost pacthes evenly split the inFlow number of metas
+        #   ifelse (leftDist < flowDist)[
+        #     let inFlowCoef (((min list 1 (flowDist - leftDist))) / (flowDist * span))
+        #     set inulin ((inulin) + (inFlowInulin * inFlowCoef))
+        #     set FO ((FO) + (inFlowFO * inFlowCoef))
+        #     set lactose ((lactose) + (inFlowLactose * inFlowCoef))
+        #     set lactate ((lactate) + (inFlowLactate * inFlowCoef))
+        #     set glucose ((glucose) + (inFlowGlucose * inFlowCoef))
+        #     set CS ((CS) + (inFlowCS * inFlowCoef))
+        #   ]
+        #   [
+        #     let added ( ((get-inulin (- (ceiling flowDist)) 0) * (min list frac (1 - remainFactor))) + ((get-inulin (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
+        #     ifelse (inulin + added) < 1000[
+        #       set inulin (inulin + (added))
+        #     ]
+        # 		[
+        # 			set inulin (1000)
+        # 		]
+        #
+        #     set added ( ((get-FO (- (ceiling flowDist)) 0) * (min list frac (1 - remainFactor))) + ((get-FO (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
+        #     ifelse (FO + added) < 1000[
+        #       set FO (FO + (added))
+        #     ]
+        # 		[
+        # 			set FO (1000)
+        # 		]
+        #
+        #     set added ( ((get-lactose (- (ceiling flowDist)) 0) * (min list frac (1 - remainFactor))) + ((get-lactose (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
+        #     ifelse (lactose + added) < 1000[
+        #       set lactose (lactose + (added))
+        #     ]
+        # 		[
+        # 			set lactose (1000)
+        # 		]
+        #
+        #     set added ( ((get-lactate (- (ceiling flowDist)) 0) * (min list frac (1 - remainFactor))) + ((get-lactate (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
+        #     ifelse (lactate + added) < 1000[
+        #       set lactate (lactate + (added))
+        #     ]
+        # 		[
+        # 			set lactate (1000)
+        # 		]
+        #
+        #     set added ( ((get-glucose (- (ceiling flowDist)) 0) * (min list frac (1 - remainFactor))) + ((get-glucose (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
+        #     ifelse (glucose + added) < 1000[
+        #       set glucose (glucose + (added))
+        #     ]
+        # 		[
+        # 			set glucose (1000)
+        # 		]
+        #
+        #     set added ( ((get-CS (- (ceiling flowDist)) 0) * (min list frac (1 - remainFactor))) + ((get-CS (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
+        #     ifelse (CS + added) < 1000[
+        #       set CS (CS + (added))
+        #     ]
+        # 		[
+        # 			set CS (1000)
+        # 		]
+        #   ]
+        #
+        # ;;Need to handle case of patch which flowDist ends in from beginning
+        #   if(leftDist = (floor flowDist))[
+        #     let added ( ((get-inulin (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
+        #     ifelse (inulin + added) < 1000[
+        #       set inulin (inulin + (added))
+        #     ]
+        # 		[
+        # 			set inulin (1000)
+        # 		]
+        #
+        #     set added ( ((get-FO (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
+        #     ifelse (FO + added) < 1000[
+        #       set FO (FO + (added))
+        #     ]
+        # 		[
+        # 			set FO (1000)
+        # 		]
+        #
+        #     set added ( ((get-lactose (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
+        #     ifelse (lactose + added) < 1000[
+        #       set lactose (lactose + (added))
+        #     ]
+        # 		[
+        # 			set lactose (1000)
+        # 		]
+        #
+        #     set added ( ((get-lactate (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
+        #     ifelse (lactate + added) < 1000[
+        #       set lactate (lactate + (added))
+        #     ]
+        # 		[
+        # 			set lactate (1000)
+        # 		]
+        #
+        #     set added ( ((get-glucose (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
+        #     ifelse (glucose + added) < 1000[
+        #       set glucose (glucose + (added))
+        #     ]
+        # 		[
+        # 			set glucose (1000)
+        # 		]
+        #
+        #     set added ( ((get-CS (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
+        #     ifelse (CS + added) < 1000[
+        #       set CS (CS + (added))
+        #     ]
+        # 		[
+        # 			set CS (1000)
+        # 		]
+        #   ]
+        #
+        #   if ((inulin < 0.001)) [
+        #     set inulin 0
+        #   ]
+        #
+        # 	if ((CS < 0.001)) [
+        # 		set CS 0
+        # 	]
+        #
+        # 	if ((FO < 0.001)) [
+        # 		set FO 0
+        # 	]
+        #
+        # 	if ((lactose < 0.001)) [
+        # 		set lactose 0
+        # 	]
+        #
+        # 	if ((lactate < 0.001)) [
+        # 		set lactate 0
+        # 	]
+        #
+        # 	if ((glucose < 0.001)) [
+        # 		set glucose 0
+        # 	]
+        #
+        # 	ifelse (((max-pxcor - min-pxcor) < 1))[
+        # 		set inulinReserve (0)
+        #   	set FOReserve (0)
+        #   	set lactoseReserve (0)
+        #   	set lactateReserve (0)
+        #   	set glucoseReserve (0)
+        #   	set CSReserve (0)
+        # 	][
+        #   	set inulinReserve ((inulin) * reserveFraction * ((max-pxcor - pxcor)/(max-pxcor - min-pxcor)))
+        #   	set FOReserve ((FO) * reserveFraction * ((max-pxcor - pxcor)/(max-pxcor - min-pxcor)))
+        #   	set lactoseReserve ((lactose) * reserveFraction * ((max-pxcor - pxcor)/(max-pxcor - min-pxcor)))
+        #   	set lactateReserve ((lactate) * reserveFraction * ((max-pxcor - pxcor)/(max-pxcor - min-pxcor)))
+        #   	set glucoseReserve ((glucose) * reserveFraction * ((max-pxcor - pxcor)/(max-pxcor - min-pxcor)))
+        #   	set CSReserve ((CS) * reserveFraction * ((max-pxcor - pxcor)/(max-pxcor - min-pxcor)))
+        # 	]
+        #
+        #   	set inulin ((inulin - inulinReserve) * (1 - trueAbsorption))
+        #   	set FO ((FO - FOReserve) * (1 - trueAbsorption))
+        #   	set lactose ((lactose - lactoseReserve) * (1 - trueAbsorption))
+        #   	set lactate ((lactate - lactateReserve) * (1 - trueAbsorption))
+        #   	set glucose ((glucose - glucoseReserve) * (1 - trueAbsorption))
+        #   	set CS ((CS - CSReserve) * (1 - trueAbsorption))
+        # end
+        pass
+        # TODO: implement
+
+    def bact_tick_behavior(self):
+        # to bactTickBehavior
+        # ;; reproduce the chosen turtle
+        #   ask bifidos [
+        #     flowMove ;; movement of the bacteria by flow
+        #   ;;randMove ;; movement of the bacteria by a combination of motility and other random forces
+        #     checkStuck ;; check if the bacteria becomes stuck or unstuck
+        #     deathBifidos ;; check that the energy of the bacteria is enough, otherwise bacteria dies
+        #     if (age mod bifidoDoub = 0 and age != 0)[ ;;this line controls on what tick mod reproduce
+        #       reproduceBact ;; run the reproduce code for bacteria
+        #     ]
+        #   	set age (age + 1) ;; increase the age of the bacteria with each tick
+        #   ]
+        #
+        #   ask desulfos [;;controls the behavior for the desulfos bacteria
+        #     flowMove
+        #   ;;randMove
+        #     checkStuck
+        #     deathDesulfos
+        #     if (age mod desulfoDoub = 0 and age != 0)[
+        #       reproduceBact
+        #     ]
+        #   	set age (age + 1)
+        #   ]
+        #
+        #   ask closts [;;controls the behavior for the closts
+        #     flowMove
+        #   ;;randMove
+        #     checkStuck
+        #     deathClosts
+        #     if (age mod clostDoub = 0 and age != 0)[
+        #       reproduceBact
+        #     ]
+        #   	set age (age + 1)
+        #   ]
+        #
+        #   ask bacteroides [;;controls the behavior for the bacteroides
+        #     flowMove
+        #   ;;randMove
+        #     checkStuck
+        #     deathbacteroides
+        #     if (age mod bacteroidDoub = 0 and age != 0)[
+        #       reproduceBact
+        #     ]
+        #   	set age (age + 1)
+        #   ]
+        #
+        # end
+        pass
+        # TODO: implement
+
+    def create_seeds(self):
+        # to createSeeds
+        # ;; controls whether an agent becomes a seed or not
+        # ;; first checks if the agent is stuck or not
+        #   ask patches[
+        #     ask turtles-here[
+        #       if (isStuck and (random 100 < seedChance))[
+        #         set isSeed true
+        #       ]
+        #     ]
+        #   ]
+        # end
+        pass
+        # TODO: implement
+
+    def bact_in(self):
+        # to bactIn
+        #   ;; controls when probiotics enter system
+        #   if ticks mod tickInflow = 0[
+        #     inConc
+        #   ]
+        # end
+        pass
+        # TODO: implement
 
     def set_true_abs(self):
         # to setTrueAbs
@@ -1249,7 +1760,22 @@ class GutPython:
         # print "ERROR! Bacteria died out. Problem with simulation leading to inaccurate results. Terminating Program."
         # 	]
         # end
-        pass
+
+        total_bacteria = (
+            self.num_bacteroids + self.num_bifidos + self.num_closts + self.num_desulfos
+        )
+        assert total_bacteria > 0, "Bacteria died out!"
+
+        # TODO: package the constants
+        self.true_absorption = self.absorption * (
+            self.absorption_constant
+            / (
+                (0.8 * (self.num_desulfos / total_bacteria))
+                + (1 * (self.num_closts / total_bacteria))
+                + (1.2 * (self.num_bacteroids / total_bacteria))
+                + (0.7 * (self.num_bifidos / total_bacteria))
+            )
+        )
 
     def set_stuck_chance(self):
         occupancy = np.zeros(self.geometry, dtype=np.int64)
