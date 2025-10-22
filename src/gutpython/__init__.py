@@ -1,3 +1,4 @@
+import itertools
 from typing import Final, Iterable, Optional, Tuple
 
 import h5py
@@ -114,9 +115,9 @@ class GutPython:
     def _bifido_is_stuck_factory(self):
         return np.zeros(self.MAX_BIFIDOS, dtype=np.bool_)
 
-    bifido_rem_attempts = field(type=np.ndarray)
+    bifido_remaining_attempts = field(type=np.ndarray)
 
-    @bifido_rem_attempts.default
+    @bifido_remaining_attempts.default
     def _bifido_rem_attempts_factory(self):
         return np.zeros(self.MAX_BIFIDOS, dtype=np.int64)
 
@@ -177,9 +178,9 @@ class GutPython:
     def _desulfo_is_stuck_factory(self):
         return np.zeros(self.MAX_DESULFOS, dtype=np.bool_)
 
-    desulfo_rem_attempts = field(type=np.ndarray)
+    desulfo_remaining_attempts = field(type=np.ndarray)
 
-    @desulfo_rem_attempts.default
+    @desulfo_remaining_attempts.default
     def _desulfo_rem_attempts_factory(self):
         return np.zeros(self.MAX_DESULFOS, dtype=np.int64)
 
@@ -240,9 +241,9 @@ class GutPython:
     def _clost_is_stuck_factory(self):
         return np.zeros(self.MAX_CLOSTS, dtype=np.bool_)
 
-    clost_rem_attempts = field(type=np.ndarray)
+    clost_remaining_attempts = field(type=np.ndarray)
 
-    @clost_rem_attempts.default
+    @clost_remaining_attempts.default
     def _clost_rem_attempts_factory(self):
         return np.zeros(self.MAX_CLOSTS, dtype=np.int64)
 
@@ -303,9 +304,9 @@ class GutPython:
     def _bacteroid_is_stuck_factory(self):
         return np.zeros(self.MAX_BACTEROIDS, dtype=np.bool_)
 
-    bacteroid_rem_attempts = field(type=np.ndarray)
+    bacteroid_remaining_attempts = field(type=np.ndarray)
 
-    @bacteroid_rem_attempts.default
+    @bacteroid_remaining_attempts.default
     def _bacteroid_rem_attempts_factory(self):
         return np.zeros(self.MAX_BACTEROIDS, dtype=np.int64)
 
@@ -515,7 +516,7 @@ class GutPython:
         self.bifido_excrete[self.bifido_pointer] = excrete
         self.bifido_is_seed[self.bifido_pointer] = is_seed
         self.bifido_is_stuck[self.bifido_pointer] = is_stuck
-        self.bifido_rem_attempts[self.bifido_pointer] = rem_attempt
+        self.bifido_remaining_attempts[self.bifido_pointer] = rem_attempt
 
         self.bifido_mask[self.bifido_pointer] = True
         self.num_bifidos += 1
@@ -529,7 +530,9 @@ class GutPython:
         self.bifido_excrete[: self.num_bifidos] = self.bifido_excrete[self.bifido_mask]
         self.bifido_is_seed[: self.num_bifidos] = self.bifido_is_seed[self.bifido_mask]
         self.bifido_is_stuck[: self.num_bifidos] = self.bifido_is_stuck[self.bifido_mask]
-        self.bifido_rem_attempts[: self.num_bifidos] = self.bifido_rem_attempts[self.bifido_mask]
+        self.bifido_remaining_attempts[: self.num_bifidos] = self.bifido_remaining_attempts[
+            self.bifido_mask
+        ]
 
         self.bifido_mask[: self.num_bifidos] = True
         self.bifido_mask[self.num_bifidos :] = False
@@ -581,8 +584,8 @@ class GutPython:
             mode="constant",
             constant_values=False,
         )
-        self.bifido_rem_attempts = np.pad(
-            self.bifido_rem_attempts,
+        self.bifido_remaining_attempts = np.pad(
+            self.bifido_remaining_attempts,
             pad_width=np.array((0, old_max_bifidos)),
             mode="constant",
             constant_values=0,
@@ -653,7 +656,7 @@ class GutPython:
         self.desulfo_excrete[self.desulfo_pointer] = excrete
         self.desulfo_is_seed[self.desulfo_pointer] = is_seed
         self.desulfo_is_stuck[self.desulfo_pointer] = is_stuck
-        self.desulfo_rem_attempts[self.desulfo_pointer] = rem_attempt
+        self.desulfo_remaining_attempts[self.desulfo_pointer] = rem_attempt
 
         self.desulfo_mask[self.desulfo_pointer] = True
         self.num_desulfos += 1
@@ -667,7 +670,7 @@ class GutPython:
         self.desulfo_excrete[: self.num_desulfos] = self.desulfo_excrete[self.desulfo_mask]
         self.desulfo_is_seed[: self.num_desulfos] = self.desulfo_is_seed[self.desulfo_mask]
         self.desulfo_is_stuck[: self.num_desulfos] = self.desulfo_is_stuck[self.desulfo_mask]
-        self.desulfo_rem_attempts[: self.num_desulfos] = self.desulfo_rem_attempts[
+        self.desulfo_remaining_attempts[: self.num_desulfos] = self.desulfo_remaining_attempts[
             self.desulfo_mask
         ]
 
@@ -721,8 +724,8 @@ class GutPython:
             mode="constant",
             constant_values=False,
         )
-        self.desulfo_rem_attempts = np.pad(
-            self.desulfo_rem_attempts,
+        self.desulfo_remaining_attempts = np.pad(
+            self.desulfo_remaining_attempts,
             pad_width=np.array((0, old_max_desulfos)),
             mode="constant",
             constant_values=0,
@@ -793,7 +796,7 @@ class GutPython:
         self.clost_excrete[self.clost_pointer] = excrete
         self.clost_is_seed[self.clost_pointer] = is_seed
         self.clost_is_stuck[self.clost_pointer] = is_stuck
-        self.clost_rem_attempts[self.clost_pointer] = rem_attempt
+        self.clost_remaining_attempts[self.clost_pointer] = rem_attempt
 
         self.clost_mask[self.clost_pointer] = True
         self.num_closts += 1
@@ -807,7 +810,9 @@ class GutPython:
         self.clost_excrete[: self.num_closts] = self.clost_excrete[self.clost_mask]
         self.clost_is_seed[: self.num_closts] = self.clost_is_seed[self.clost_mask]
         self.clost_is_stuck[: self.num_closts] = self.clost_is_stuck[self.clost_mask]
-        self.clost_rem_attempts[: self.num_closts] = self.clost_rem_attempts[self.clost_mask]
+        self.clost_remaining_attempts[: self.num_closts] = self.clost_remaining_attempts[
+            self.clost_mask
+        ]
 
         self.clost_mask[: self.num_closts] = True
         self.clost_mask[self.num_closts :] = False
@@ -859,8 +864,8 @@ class GutPython:
             mode="constant",
             constant_values=False,
         )
-        self.clost_rem_attempts = np.pad(
-            self.clost_rem_attempts,
+        self.clost_remaining_attempts = np.pad(
+            self.clost_remaining_attempts,
             pad_width=np.array((0, old_max_closts)),
             mode="constant",
             constant_values=0,
@@ -933,7 +938,7 @@ class GutPython:
         self.bacteroid_excrete[self.bacteroid_pointer] = excrete
         self.bacteroid_is_seed[self.bacteroid_pointer] = is_seed
         self.bacteroid_is_stuck[self.bacteroid_pointer] = is_stuck
-        self.bacteroid_rem_attempts[self.bacteroid_pointer] = rem_attempt
+        self.bacteroid_remaining_attempts[self.bacteroid_pointer] = rem_attempt
 
         self.bacteroid_mask[self.bacteroid_pointer] = True
         self.num_bacteroids += 1
@@ -951,9 +956,9 @@ class GutPython:
         self.bacteroid_is_stuck[: self.num_bacteroids] = self.bacteroid_is_stuck[
             self.bacteroid_mask
         ]
-        self.bacteroid_rem_attempts[: self.num_bacteroids] = self.bacteroid_rem_attempts[
-            self.bacteroid_mask
-        ]
+        self.bacteroid_remaining_attempts[: self.num_bacteroids] = (
+            self.bacteroid_remaining_attempts[self.bacteroid_mask]
+        )
 
         self.bacteroid_mask[: self.num_bacteroids] = True
         self.bacteroid_mask[self.num_bacteroids :] = False
@@ -1005,8 +1010,8 @@ class GutPython:
             mode="constant",
             constant_values=False,
         )
-        self.bacteroid_rem_attempts = np.pad(
-            self.bacteroid_rem_attempts,
+        self.bacteroid_remaining_attempts = np.pad(
+            self.bacteroid_remaining_attempts,
             pad_width=np.array((0, old_max_bacteroids)),
             mode="constant",
             constant_values=0,
@@ -1428,6 +1433,17 @@ class GutPython:
         #     set remAttempts 2 ;; reset the number of attempts
         #     set energy (energy - (100 / 1440)) ;; decrease the energy of the bacteria, currently survive 24 hours no eat
         #   ]
+
+        self.bacteroid_remaining_attempts[:] = 2
+        self.bifido_remaining_attempts[:] = 2
+        self.clost_remaining_attempts[:] = 2
+        self.desulfo_remaining_attempts[:] = 2
+
+        self.bacteroid_energy -= 100 / 1440  # 1440 = mins in day
+        self.bifido_energy -= 100 / 1440  # 1440 = mins in day
+        self.clost_energy -= 100 / 1440  # 1440 = mins in day
+        self.desulfo_energy -= 100 / 1440  # 1440 = mins in day
+
         #   let allMetas (list CS FO glucose inulin lactate lactose);; list containing numbers of all the metas
         #   set avaMetas []
         #
@@ -1454,8 +1470,62 @@ class GutPython:
         #     set iter (iter + 1)
         #   ]
         # end
-        pass
-        # TODO: implement
+
+        hungry_bacteroid_mask = (
+            self.bacteroid_mask
+            & (self.bacteroid_energy < 80)
+            & (self.bacteroid_remaining_attempts > 0)
+        )
+        hungry_bifido_mask = (
+            self.bifido_mask & (self.bifido_energy < 80) & (self.bifido_remaining_attempts > 0)
+        )
+        hungry_clost_mask = (
+            self.clost_mask & (self.clost_energy < 80) & (self.clost_remaining_attempts > 0)
+        )
+        hungry_desulfo_mask = (
+            self.desulfo_mask & (self.desulfo_energy < 80) & (self.desulfo_remaining_attempts > 0)
+        )
+
+        hungry_bacteria = list(
+            itertools.chain(
+                zip(itertools.repeat("bacteroid"), np.where(hungry_bacteroid_mask)),
+                zip(itertools.repeat("bifido"), np.where(hungry_bifido_mask)),
+                zip(itertools.repeat("clost"), np.where(hungry_clost_mask)),
+                zip(itertools.repeat("desulfo"), np.where(hungry_desulfo_mask)),
+            )
+        )
+
+        eating_iters = 0
+        max_eating_iters = 100 * self.GRID_HEIGHT * self.GRID_WIDTH  # 100 per patch
+        metabolites = ["cs", "fo", "glucose", "inulin", "lactate", "lactose"]
+
+        while eating_iters < max_eating_iters and len(hungry_bacteria) > 0:
+            eating_iters += 1
+
+            hungry_cell_idx = np.random.randint(len(hungry_bacteria))
+            bact_type, idx = hungry_bacteria[hungry_cell_idx]
+
+            metabolite_idx = np.random.randint(len(metabolites))
+            metabolite = metabolites[metabolite_idx]
+
+            self.bact_eat(bact_type, idx, metabolite)
+
+            if bact_type == "bacteroid":
+                self.bacteroid_remaining_attempts[idx] -= 1
+                if self.bacteroid_energy[idx] >= 80 or self.bacteroid_remaining_attempts[idx] <= 0:
+                    hungry_bacteria.pop(hungry_cell_idx)
+            elif bact_type == "bifido":
+                self.bifido_remaining_attempts[idx] -= 1
+                if self.bifido_energy[idx] >= 80 or self.bifido_remaining_attempts[idx] <= 0:
+                    hungry_bacteria.pop(hungry_cell_idx)
+            elif bact_type == "clost":
+                self.clost_remaining_attempts[idx] -= 1
+                if self.clost_energy[idx] >= 80 or self.clost_remaining_attempts[idx] <= 0:
+                    hungry_bacteria.pop(hungry_cell_idx)
+            elif bact_type == "desulfo":
+                self.desulfo_remaining_attempts[idx] -= 1
+                if self.desulfo_energy[idx] >= 80 or self.desulfo_remaining_attempts[idx] <= 0:
+                    hungry_bacteria.pop(hungry_cell_idx)
 
     def store_metabolites(self):
         # to storeMetabolites
