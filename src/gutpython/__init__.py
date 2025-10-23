@@ -42,6 +42,8 @@ class GutPython:
     init_num_closts: int = field(default=921)  # TODO: uhh? Seems awfully specific.
     init_num_desulfos: int = field(default=70)
 
+    bifido_lactate_production: float = field(default=0.005)
+
     ######################################################################
     # hidden parameters (magic constants)
 
@@ -1510,22 +1512,202 @@ class GutPython:
 
             self.bact_eat(bact_type, idx, metabolite)
 
-            if bact_type == "bacteroid":
-                self.bacteroid_remaining_attempts[idx] -= 1
-                if self.bacteroid_energy[idx] >= 80 or self.bacteroid_remaining_attempts[idx] <= 0:
-                    hungry_bacteria.pop(hungry_cell_idx)
-            elif bact_type == "bifido":
-                self.bifido_remaining_attempts[idx] -= 1
-                if self.bifido_energy[idx] >= 80 or self.bifido_remaining_attempts[idx] <= 0:
-                    hungry_bacteria.pop(hungry_cell_idx)
-            elif bact_type == "clost":
-                self.clost_remaining_attempts[idx] -= 1
-                if self.clost_energy[idx] >= 80 or self.clost_remaining_attempts[idx] <= 0:
-                    hungry_bacteria.pop(hungry_cell_idx)
-            elif bact_type == "desulfo":
-                self.desulfo_remaining_attempts[idx] -= 1
-                if self.desulfo_energy[idx] >= 80 or self.desulfo_remaining_attempts[idx] <= 0:
-                    hungry_bacteria.pop(hungry_cell_idx)
+            getattr(self, f"{bact_type}_remaining_attempts")[idx] -= 1
+            if (
+                getattr(self, f"{bact_type}_energy")[idx] >= 80
+                or getattr(self, f"{bact_type}_remaining_attempts")[idx] <= 0
+            ):
+                hungry_bacteria.pop(hungry_cell_idx)
+
+    def bact_eat(self, bact_type, idx, metabolite):
+        match metabolite:
+            case "cs":
+                #   if (metaNum = 10)[;;CS
+                #     ifelse (breed = desulfos)[;; check correct breed
+                #       set energy (energy + 50);; increase the energy of the bacteria
+                #       ask patch-here [
+                #           set CS (CS - 1);; reduce the meta count
+                #         if (CS < 1)[;; remove the meta from avaMetas if there is no more of it
+                #           set avaMetas remove 10 avaMetas
+                #         ]
+                #       ]
+                #     ]
+                #     [;;else
+                #       ;;do nothing
+                #     ]
+                #   ]
+                if bact_type != "desulfo":
+                    return
+                loc = getattr(self, f"{bact_type}_location")[idx].astype(int)
+                if self.cs[loc] >= 1:
+                    getattr(self, f"{bact_type}_energy")[idx] += 50
+                    self.cs[loc] -= 1
+            case "fo":
+                #   if (metaNum = 11)[;;FO
+                #     ifelse (breed = closts or breed = bacteroides)[
+                #       set energy (energy + 25)
+                #       ask patch-here [
+                #         set FO (FO - 1)
+                #         if (FO < 1)[
+                #           set avaMetas remove 11 avaMetas
+                #         ]
+                #       ]
+                #     ]
+                #     [;;else
+                #       if(breed = bifidos)[
+                #         set energy (energy + 50)
+                #         ask patch-here [
+                #           set FO (FO - 1)
+                #           if (FO < 1)[
+                #             set avaMetas remove 11 avaMetas
+                #           ]
+                #         ]
+                #         ask patch-here [
+                #           set lactate (lactate + bifido-lactate-production)
+                #         ]
+                #       ]
+                #     ];;end else
+                #   ]
+                if bact_type not in {"clost", "bacteroid", "bifido"}:
+                    return
+                loc = getattr(self, f"{bact_type}_location")[idx].astype(int)
+                if self.fo[loc] >= 1:
+                    getattr(self, f"{bact_type}_energy")[idx] += 50 if bact_type == "bifido" else 25
+                    self.fo[loc] -= 1
+                if bact_type == "bifido":
+                    self.lactate[loc] += self.bifido_lactate_production
+            case "glucose":
+                #   if (metaNum = 12)[;;GLUCOSE
+                #     ifelse (breed = closts or breed = bacteroides)[
+                #       set energy (energy + 50)
+                #       ask patch-here [
+                #         set glucose (glucose - 1)
+                #         if (glucose < 1)[
+                #           set avaMetas remove 12 avaMetas
+                #         ]
+                #       ]
+                #     ]
+                #     [;;else
+                #       if (breed = bifidos) [
+                #         set energy (energy + 25)
+                #         ask patch-here [
+                #         	set glucose (glucose - 1)
+                #           if (glucose < 1)[
+                #             set avaMetas remove 12 avaMetas
+                #           ]
+                #         ]
+                #         ask patch-here [
+                #           set lactate (lactate + bifido-lactate-production)
+                #         ]
+                #       ]
+                #     ];;end else
+                #   ]
+                if bact_type not in {"clost", "bacteroid", "bifido"}:
+                    return
+                loc = getattr(self, f"{bact_type}_location")[idx].astype(int)
+                if self.glucose[loc] >= 1:
+                    getattr(self, f"{bact_type}_energy")[idx] += 25 if bact_type == "bifido" else 50
+                    self.glucose[loc] -= 1
+                if bact_type == "bifido":
+                    self.lactate[loc] += self.bifido_lactate_production
+            case "inulin":
+                #   if (metaNum = 13)[;;INULIN
+                #     ifelse (breed = closts or breed = bacteroides)[
+                #       set energy (energy + 25)
+                #       ask patch-here [
+                #         set inulin (inulin - 1)
+                #         if (inulin < 1)[
+                #           set avaMetas remove 13 avaMetas
+                #         ]
+                #       ]
+                #     ]
+                #     [;;else
+                #       if (breed = bifidos) [
+                #       set energy (energy + 25)
+                #         ask patch-here [
+                #           	set inulin (inulin - 1)
+                #           if (inulin < 1)[
+                #             set avaMetas remove 13 avaMetas
+                #           ]
+                #         ]
+                #         ask patch-here [
+                #           set lactate (lactate + bifido-lactate-production)
+                #         ]
+                #       ]
+                #     ];;end else
+                #   ]
+                if bact_type not in {"clost", "bacteroid", "bifido"}:
+                    return
+                loc = getattr(self, f"{bact_type}_location")[idx].astype(int)
+                if self.inulin[loc] >= 1:
+                    getattr(self, f"{bact_type}_energy")[idx] += 25
+                    self.inulin[loc] -= 1
+                if bact_type == "bifido":
+                    self.lactate[loc] += self.bifido_lactate_production
+                pass
+            case "lactate":
+                #   if (metaNum = 14)[;;LACTATE
+                #     ifelse (breed = (desulfos))[
+                #       set energy (energy + 50)
+                #       ask patch-here [
+                #         set lactate (lactate - 1)
+                #         if (lactate < 1)[
+                #           set avaMetas remove 14 avaMetas
+                #         ]
+                #       ]
+                #     ]
+                #     [;;else
+                #       ;;do nothing
+                #     ]
+                #   ]
+                if bact_type != "desulfo":
+                    return
+                loc = getattr(self, f"{bact_type}_location")[idx].astype(int)
+                if self.lactate[loc] >= 1:
+                    getattr(self, f"{bact_type}_energy")[idx] += 50
+                    self.lactate[loc] -= 1
+            case "lactose":
+                #   ifelse (metaNum = 15)[;;LACTOSE
+                #     ifelse (breed = closts or breed = bacteroides)[
+                #       ifelse (breed = closts)[
+                #         set energy (energy + 25)
+                #       ]
+                #       [;;else
+                #         set energy (energy + 50)
+                #       ];;end else
+                #       ask patch-here [
+                #         set lactose (lactose - 1)
+                #         if (lactose < 1)[
+                #           set avaMetas remove 15 avaMetas
+                #         ]
+                #       ]
+                #     ]
+                #     [;;else
+                #       if (breed = bifidos) [
+                #         set energy (energy + 50)
+                #         ask patch-here [
+                #           	set lactose (lactose - 1)
+                #           if (lactose < 1)[
+                #             set avaMetas remove 15 avaMetas
+                #           ]
+                #         ]
+                #         ask patch-here [
+                #           set lactate (lactate + bifido-lactate-production)
+                #         ]
+                #       ]
+                #     ];;end else
+                #   ]
+                if bact_type not in {"clost", "bacteroid", "bifido"}:
+                    return
+                loc = getattr(self, f"{bact_type}_location")[idx].astype(int)
+                if self.lactose[loc] >= 1:
+                    getattr(self, f"{bact_type}_energy")[idx] += 25 if bact_type == "clost" else 50
+                    self.lactose[loc] -= 1
+                if bact_type == "bifido":
+                    self.lactate[loc] += self.bifido_lactate_production
+                pass
+            case _:
+                assert False
 
     def store_metabolites(self):
         # to storeMetabolites
