@@ -54,6 +54,11 @@ class GutPython:
     glucose_inflow: float = field(default=30.0)
     cs_inflow: float = field(default=0.1)
 
+    bifido_doub: int = field(default=330)
+    desulfo_doub: int = field(default=330)
+    bacteroid_doub: int = field(default=330)
+    clost_doub: int = field(default=330)
+
     ######################################################################
     # hidden parameters (magic constants)
 
@@ -1443,7 +1448,8 @@ class GutPython:
         # ;; run this on a ask patches to have them start the turtle eating process
         #   ask turtles-here [
         #     set remAttempts 2 ;; reset the number of attempts
-        #     set energy (energy - (100 / 1440)) ;; decrease the energy of the bacteria, currently survive 24 hours no eat
+        #     set energy (energy - (100 / 1440)) ;; decrease the energy of the bacteria, currently survive 24 hours no
+        #     ;; eat
         #   ]
 
         self.bacteroid_remaining_attempts[:] = 2
@@ -1471,7 +1477,8 @@ class GutPython:
         #   let iter 0 ;; used to limit the number of times the next while loop will occur, aribitrary
         #   ;; do the eating till no metas or not hungry
         #   while [(length(avaMetas) > 0) and any? hungryBact and iter < 100] [
-        #     ;; code here to randomly select a turtle from hungryBact and then ask it to run bactEat with a random meta from ava. list
+        #     ;; code here to randomly select a turtle from hungryBact and then ask it to run bactEat with a random
+        #     ;; meta from ava. list
         #     ask one-of hungryBact [
         #       bactEat(one-of avaMetas)
         #       set remAttempts remAttempts - 1
@@ -1753,7 +1760,8 @@ class GutPython:
         #   let leftDist (pxcor - min-pxcor)
         #
         #   if ((inulin < 0) or (CS < 0) or (FO < 0) or (lactose < 0) or (lactate < 0) or (glucose < 0)) [
-        #     print "ERROR! Patch reported negative metabolite. Problem with simulation leading to inaccurate results. Terminating Program."
+        #     print "ERROR! Patch reported negative metabolite. Problem with simulation leading to inaccurate results.
+        #     Terminating Program."
         #     set negMeta true
         #     stop
         #   ]
@@ -1785,7 +1793,8 @@ class GutPython:
         #     set CS ((CS) + (inFlowCS * inFlowCoef))
         #   ]
         #   [
-        #     let added ( ((get-inulin (- (ceiling flowDist)) 0) * (min list frac (1 - remainFactor))) + ((get-inulin (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
+        #     let added ( ((get-inulin (- (ceiling flowDist)) 0) * (min list frac (1 - remainFactor)))
+        #     + ((get-inulin (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
         #     ifelse (inulin + added) < 1000[
         #       set inulin (inulin + (added))
         #     ]
@@ -1880,6 +1889,65 @@ class GutPython:
         #     ]
         #   	set age (age + 1) ;; increase the age of the bacteria with each tick
         #   ]
+
+        # flowMove
+        movable_bifidos = self.bifido_mask & ~self.bifido_is_stuck & ~self.bifido_is_seed
+        self.bifido_locations[movable_bifidos, 0] += self.flow_dist * self.bifido_flow_const
+        self.bifido_excrete[self.bifido_locations[movable_bifidos, 0] >= self.GRID_WIDTH + 0.5] = (
+            True
+        )
+
+        # checkStuck
+        sticking_bifidos = (
+            self.bifido_mask
+            & ~self.bifido_is_stuck
+            & (np.random.rand(self.bifido_is_stuck.shape[0]) < (self.stuck_chance / 100.0))
+        )
+        self.bifido_is_stuck[sticking_bifidos] = True
+        unsticking_bifidos = (
+            self.bifido_mask
+            & self.bifido_is_stuck
+            & (np.random.rand(self.bifido_is_stuck.shape[0]) < (self.unstuck_chance / 100.0))
+        )
+        self.bifido_is_stuck[unsticking_bifidos] = False
+
+        # deathBifidos
+        to_kill = self.bifido_mask & (self.bifido_energy <= 0 | self.bifido_excrete)
+        num_to_kill = np.sum(to_kill)
+        self.bifido_mask[to_kill] = False
+        self.num_bifidos -= num_to_kill
+
+        # reproduce
+        to_reproduce = (
+            self.bifido_mask
+            & (self.bifido_age % self.bifido_doub == 0)
+            & (self.bifido_age > 0)
+            & (self.bifido_energy > 50)
+        )
+        # TODO: why don't we
+        #  self.bifido_age[idx] = 0
+        #  and make sure that 0 <= age < bifido_doub everywhere
+        #  this could simplify to_reproduce's formula:
+        #  (self.bifido_age % self.bifido_doub == 0) & (self.bifido_age > 0)
+        #  -> (self.bifido_age >= self.bifido_doub)
+        #  depends though; is enough time correct or is it the cycle
+        if np.any(to_reproduce):
+            self.bifido_energy[to_reproduce] /= 2
+            # making copies so that we don't have issues if the underlying array needs to compact or resize
+            new_cell_energies = self.bifido_energy[to_reproduce].copy()
+            new_cell_locs = self.bifido_locations[to_reproduce, :].copy()
+            for energy, loc in zip(new_cell_energies, new_cell_locs):
+                self.create_bifido(
+                    location=loc,
+                    energy=energy,
+                    is_stuck=False,
+                    is_seed=False,
+                    age=0,
+                )
+
+        # age
+        self.bifido_age += 1
+
         #
         #   ask desulfos [;;controls the behavior for the desulfos bacteria
         #     flowMove
@@ -1891,7 +1959,58 @@ class GutPython:
         #     ]
         #   	set age (age + 1)
         #   ]
-        #
+
+        # flowMove
+        movable_desulfos = self.desulfo_mask & ~self.desulfo_is_stuck & ~self.desulfo_is_seed
+        self.desulfo_locations[movable_desulfos, 0] += self.flow_dist * self.desulfo_flow_const
+        self.desulfo_excrete[
+            self.desulfo_locations[movable_desulfos, 0] >= self.GRID_WIDTH + 0.5
+        ] = True
+
+        # checkStuck
+        sticking_desulfos = (
+            self.desulfo_mask
+            & ~self.desulfo_is_stuck
+            & (np.random.rand(self.desulfo_is_stuck.shape[0]) < (self.stuck_chance / 100.0))
+        )
+        self.desulfo_is_stuck[sticking_desulfos] = True
+        unsticking_desulfos = (
+            self.desulfo_mask
+            & self.desulfo_is_stuck
+            & (np.random.rand(self.desulfo_is_stuck.shape[0]) < (self.unstuck_chance / 100.0))
+        )
+        self.desulfo_is_stuck[unsticking_desulfos] = False
+
+        # deathDesulfos
+        to_kill = self.desulfo_mask & (self.desulfo_energy <= 0 | self.desulfo_excrete)
+        num_to_kill = np.sum(to_kill)
+        self.desulfo_mask[to_kill] = False
+        self.num_desulfos -= num_to_kill
+
+        # reproduce
+        to_reproduce = (
+            self.desulfo_mask
+            & (self.desulfo_age % self.desulfo_doub == 0)
+            & (self.desulfo_age > 0)
+            & (self.desulfo_energy > 50)
+        )
+        if np.any(to_reproduce):
+            self.desulfo_energy[to_reproduce] /= 2
+            # making copies so that we don't have issues if the underlying array needs to compact or resize
+            new_cell_energies = self.desulfo_energy[to_reproduce].copy()
+            new_cell_locs = self.desulfo_locations[to_reproduce, :].copy()
+            for energy, loc in zip(new_cell_energies, new_cell_locs):
+                self.create_desulfo(
+                    location=loc,
+                    energy=energy,
+                    is_stuck=False,
+                    is_seed=False,
+                    age=0,
+                )
+
+        # age
+        self.desulfo_age += 1
+
         #   ask closts [;;controls the behavior for the closts
         #     flowMove
         #   ;;randMove
@@ -1902,6 +2021,56 @@ class GutPython:
         #     ]
         #   	set age (age + 1)
         #   ]
+
+        # flowMove
+        movable_closts = self.clost_mask & ~self.clost_is_stuck & ~self.clost_is_seed
+        self.clost_locations[movable_closts, 0] += self.flow_dist * self.clost_flow_const
+        self.clost_excrete[self.clost_locations[movable_closts, 0] >= self.GRID_WIDTH + 0.5] = True
+
+        # checkStuck
+        sticking_closts = (
+            self.clost_mask
+            & ~self.clost_is_stuck
+            & (np.random.rand(self.clost_is_stuck.shape[0]) < (self.stuck_chance / 100.0))
+        )
+        self.clost_is_stuck[sticking_closts] = True
+        unsticking_closts = (
+            self.clost_mask
+            & self.clost_is_stuck
+            & (np.random.rand(self.clost_is_stuck.shape[0]) < (self.unstuck_chance / 100.0))
+        )
+        self.clost_is_stuck[unsticking_closts] = False
+
+        # deathClosts
+        to_kill = self.clost_mask & (self.clost_energy <= 0 | self.clost_excrete)
+        num_to_kill = np.sum(to_kill)
+        self.clost_mask[to_kill] = False
+        self.num_closts -= num_to_kill
+
+        # reproduce
+        to_reproduce = (
+            self.clost_mask
+            & (self.clost_age % self.clost_doub == 0)
+            & (self.clost_age > 0)
+            & (self.clost_energy > 50)
+        )
+        if np.any(to_reproduce):
+            self.clost_energy[to_reproduce] /= 2
+            # making copies so that we don't have issues if the underlying array needs to compact or resize
+            new_cell_energies = self.clost_energy[to_reproduce].copy()
+            new_cell_locs = self.clost_locations[to_reproduce, :].copy()
+            for energy, loc in zip(new_cell_energies, new_cell_locs):
+                self.create_clost(
+                    location=loc,
+                    energy=energy,
+                    is_stuck=False,
+                    is_seed=False,
+                    age=0,
+                )
+
+        # age
+        self.clost_age += 1
+
         #
         #   ask bacteroides [;;controls the behavior for the bacteroides
         #     flowMove
@@ -1914,9 +2083,61 @@ class GutPython:
         #   	set age (age + 1)
         #   ]
         #
-        # end
-        pass
-        # TODO: implement
+
+        # flowMove
+        movable_bacteroids = (
+            self.bacteroid_mask & ~self.bacteroid_is_stuck & ~self.bacteroid_is_seed
+        )
+        self.bacteroid_locations[movable_bacteroids, 0] += (
+            self.flow_dist * self.bacteroid_flow_const
+        )
+        self.bacteroid_excrete[
+            self.bacteroid_locations[movable_bacteroids, 0] >= self.GRID_WIDTH + 0.5
+        ] = True
+
+        # checkStuck
+        sticking_bacteroids = (
+            self.bacteroid_mask
+            & ~self.bacteroid_is_stuck
+            & (np.random.rand(self.bacteroid_is_stuck.shape[0]) < (self.stuck_chance / 100.0))
+        )
+        self.bacteroid_is_stuck[sticking_bacteroids] = True
+        unsticking_bacteroids = (
+            self.bacteroid_mask
+            & self.bacteroid_is_stuck
+            & (np.random.rand(self.bacteroid_is_stuck.shape[0]) < (self.unstuck_chance / 100.0))
+        )
+        self.bacteroid_is_stuck[unsticking_bacteroids] = False
+
+        # deathbacteroids
+        to_kill = self.bacteroid_mask & (self.bacteroid_energy <= 0 | self.bacteroid_excrete)
+        num_to_kill = np.sum(to_kill)
+        self.bacteroid_mask[to_kill] = False
+        self.num_bacteroids -= num_to_kill
+
+        # reproduce
+        to_reproduce = (
+            self.bacteroid_mask
+            & (self.bacteroid_age % self.bacteroid_doub == 0)
+            & (self.bacteroid_age > 0)
+            & (self.bacteroid_energy > 50)
+        )
+        if np.any(to_reproduce):
+            self.bacteroid_energy[to_reproduce] /= 2
+            # making copies so that we don't have issues if the underlying array needs to compact or resize
+            new_cell_energies = self.bacteroid_energy[to_reproduce].copy()
+            new_cell_locs = self.bacteroid_locations[to_reproduce, :].copy()
+            for energy, loc in zip(new_cell_energies, new_cell_locs):
+                self.create_bacteroid(
+                    location=loc,
+                    energy=energy,
+                    is_stuck=False,
+                    is_seed=False,
+                    age=0,
+                )
+
+        # age
+        self.bacteroid_age += 1
 
     def create_seeds(self):
         # to createSeeds
