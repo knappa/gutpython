@@ -1,4 +1,5 @@
 import itertools
+import math
 from typing import Final, Iterable, Optional, Tuple
 
 import h5py
@@ -43,6 +44,15 @@ class GutPython:
     init_num_desulfos: int = field(default=70)
 
     bifido_lactate_production: float = field(default=0.005)
+
+    flow_dist: float = field(default=0.28)
+
+    inulin_inflow: float = field(default=10.0)
+    fo_inflow: float = field(default=25.0)
+    lactose_inflow: float = field(default=15.0)
+    lactate_inflow: float = field(default=0.0)
+    glucose_inflow: float = field(default=30.0)
+    cs_inflow: float = field(default=0.1)
 
     ######################################################################
     # hidden parameters (magic constants)
@@ -1731,9 +1741,15 @@ class GutPython:
         # to makeMetabolites
         # ;; Runs through all the metabolites and makes them, and moves them.
         #   let frac (flowDist - (floor( flowDist )))
-        #
+
+        upper_flow_dist: int = math.ceil(self.flow_dist)
+        lower_flow_dist: int = math.floor(self.flow_dist)
+        frac: float = self.flow_dist - lower_flow_dist
+
         #   let span ((max-pycor - min-pycor) + 1)
-        #
+
+        span: int = self.GRID_HEIGHT
+
         #   let leftDist (pxcor - min-pxcor)
         #
         #   if ((inulin < 0) or (CS < 0) or (FO < 0) or (lactose < 0) or (lactate < 0) or (glucose < 0)) [
@@ -1776,123 +1792,39 @@ class GutPython:
         # 		[
         # 			set inulin (1000)
         # 		]
-        #
-        #     set added ( ((get-FO (- (ceiling flowDist)) 0) * (min list frac (1 - remainFactor))) + ((get-FO (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
-        #     ifelse (FO + added) < 1000[
-        #       set FO (FO + (added))
-        #     ]
-        # 		[
-        # 			set FO (1000)
-        # 		]
-        #
-        #     set added ( ((get-lactose (- (ceiling flowDist)) 0) * (min list frac (1 - remainFactor))) + ((get-lactose (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
-        #     ifelse (lactose + added) < 1000[
-        #       set lactose (lactose + (added))
-        #     ]
-        # 		[
-        # 			set lactose (1000)
-        # 		]
-        #
-        #     set added ( ((get-lactate (- (ceiling flowDist)) 0) * (min list frac (1 - remainFactor))) + ((get-lactate (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
-        #     ifelse (lactate + added) < 1000[
-        #       set lactate (lactate + (added))
-        #     ]
-        # 		[
-        # 			set lactate (1000)
-        # 		]
-        #
-        #     set added ( ((get-glucose (- (ceiling flowDist)) 0) * (min list frac (1 - remainFactor))) + ((get-glucose (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
-        #     ifelse (glucose + added) < 1000[
-        #       set glucose (glucose + (added))
-        #     ]
-        # 		[
-        # 			set glucose (1000)
-        # 		]
-        #
-        #     set added ( ((get-CS (- (ceiling flowDist)) 0) * (min list frac (1 - remainFactor))) + ((get-CS (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
-        #     ifelse (CS + added) < 1000[
-        #       set CS (CS + (added))
-        #     ]
-        # 		[
-        # 			set CS (1000)
-        # 		]
-        #   ]
-        #
+
+        in_flow_coef = np.clip(
+            (self.flow_dist - np.arange(upper_flow_dist)) / (self.flow_dist * span), 0, 1
+        )[:, np.newaxis]
+        remain_factor = 0 if self.flow_dist >= 1 else 1 - self.flow_dist
+
+        for metabolite, metabolite_prev, metabolite_reserve, metabolite_inflow in {
+            (self.inulin, self.inulin_prev, self.inulin_reserve, self.inulin_inflow),
+            (self.fo, self.fo_prev, self.fo_reserve, self.fo_inflow),
+            (self.lactose, self.lactose_prev, self.lactose_reserve, self.lactose_inflow),
+            (self.lactate, self.lactate_prev, self.lactate_reserve, self.lactate_inflow),
+            (self.glucose, self.glucose_prev, self.glucose_reserve, self.glucose_inflow),
+            (self.cs, self.cs_prev, self.cs_reserve, self.cs_inflow),
+        }:
+            metabolite += metabolite_reserve
+            metabolite *= remain_factor
+
+            metabolite[:upper_flow_dist, :] += in_flow_coef * metabolite_inflow
+
+            if frac == 0.0:
+                metabolite[upper_flow_dist:, :] += metabolite_prev[:-upper_flow_dist, :] * (
+                    1 - remain_factor
+                )
+            else:
+                metabolite[upper_flow_dist:, :] = metabolite_prev[:-upper_flow_dist, :] * frac * (
+                    1 - remain_factor
+                ) + metabolite_prev[1:-lower_flow_dist, :] * (1 - frac) * (1 - remain_factor)
+            np.clip(metabolite, 0, 1000, out=metabolite)
+            metabolite[metabolite < 0.001] = 0
+
         # ;;Need to handle case of patch which flowDist ends in from beginning
-        #   if(leftDist = (floor flowDist))[
-        #     let added ( ((get-inulin (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
-        #     ifelse (inulin + added) < 1000[
-        #       set inulin (inulin + (added))
-        #     ]
-        # 		[
-        # 			set inulin (1000)
-        # 		]
-        #
-        #     set added ( ((get-FO (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
-        #     ifelse (FO + added) < 1000[
-        #       set FO (FO + (added))
-        #     ]
-        # 		[
-        # 			set FO (1000)
-        # 		]
-        #
-        #     set added ( ((get-lactose (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
-        #     ifelse (lactose + added) < 1000[
-        #       set lactose (lactose + (added))
-        #     ]
-        # 		[
-        # 			set lactose (1000)
-        # 		]
-        #
-        #     set added ( ((get-lactate (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
-        #     ifelse (lactate + added) < 1000[
-        #       set lactate (lactate + (added))
-        #     ]
-        # 		[
-        # 			set lactate (1000)
-        # 		]
-        #
-        #     set added ( ((get-glucose (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
-        #     ifelse (glucose + added) < 1000[
-        #       set glucose (glucose + (added))
-        #     ]
-        # 		[
-        # 			set glucose (1000)
-        # 		]
-        #
-        #     set added ( ((get-CS (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
-        #     ifelse (CS + added) < 1000[
-        #       set CS (CS + (added))
-        #     ]
-        # 		[
-        # 			set CS (1000)
-        # 		]
-        #   ]
-        #
-        #   if ((inulin < 0.001)) [
-        #     set inulin 0
-        #   ]
-        #
-        # 	if ((CS < 0.001)) [
-        # 		set CS 0
-        # 	]
-        #
-        # 	if ((FO < 0.001)) [
-        # 		set FO 0
-        # 	]
-        #
-        # 	if ((lactose < 0.001)) [
-        # 		set lactose 0
-        # 	]
-        #
-        # 	if ((lactate < 0.001)) [
-        # 		set lactate 0
-        # 	]
-        #
-        # 	if ((glucose < 0.001)) [
-        # 		set glucose 0
-        # 	]
-        #
+        # ACK: I think that I already have? TODO: check
+
         # 	ifelse (((max-pxcor - min-pxcor) < 1))[
         # 		set inulinReserve (0)
         #   	set FOReserve (0)
@@ -1915,9 +1847,25 @@ class GutPython:
         #   	set lactate ((lactate - lactateReserve) * (1 - trueAbsorption))
         #   	set glucose ((glucose - glucoseReserve) * (1 - trueAbsorption))
         #   	set CS ((CS - CSReserve) * (1 - trueAbsorption))
-        # end
-        pass
-        # TODO: implement
+
+        for metabolite, metabolite_reserve in [
+            (self.inulin, self.inulin_reserve),
+            (self.fo, self.fo_reserve),
+            (self.lactose, self.lactose_reserve),
+            (self.lactate, self.lactate_reserve),
+            (self.glucose, self.glucose_reserve),
+            (self.cs, self.cs_reserve),
+        ]:
+            if self.GRID_WIDTH == 1:
+                metabolite_reserve[:, :] = 0.0
+            else:
+                metabolite_reserve[:, :] = (
+                    metabolite
+                    * self.reserve_fraction
+                    * np.arange(self.GRID_WIDTH)[::-1, np.newaxis]
+                    / (self.GRID_WIDTH - 1)
+                )
+            metabolite[:, :] = (metabolite - metabolite_reserve) * (1 - self.true_absorption)
 
     def bact_tick_behavior(self):
         # to bactTickBehavior
