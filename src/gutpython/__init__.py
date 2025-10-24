@@ -59,6 +59,12 @@ class GutPython:
     bacteroid_doub: int = field(default=330)
     clost_doub: int = field(default=330)
 
+    tick_in_flow: int = field(default=1)  # TODO: value?
+    in_conc_bacteroids: int = field(default=0)
+    in_conc_bifidos: int = field(default=0)
+    in_conc_closts: int = field(default=0)
+    in_conc_desulfos: int = field(default=0)
+
     ######################################################################
     # hidden parameters (magic constants)
 
@@ -69,16 +75,16 @@ class GutPython:
 
     true_absorption: float = field(default=0.0)  # TODO: understand units.
 
-    neg_meta: bool = False
-    test_state: int = 0
-    ticks: int = 0
+    # neg_meta: bool = False
+    test_state: int = field(default=0)
+    ticks: int = field(default=0)
 
     ######################################################################
     # static properties
 
     @property
     def geometry(self) -> Tuple[int, int]:
-        return self.GRID_HEIGHT, self.GRID_WIDTH
+        return self.GRID_WIDTH, self.GRID_HEIGHT
 
     ######################################################################
     # dynamic properties
@@ -135,14 +141,8 @@ class GutPython:
     bifido_remaining_attempts = field(type=np.ndarray)
 
     @bifido_remaining_attempts.default
-    def _bifido_rem_attempts_factory(self):
+    def _bifido_remaining_attempts_factory(self):
         return np.zeros(self.MAX_BIFIDOS, dtype=np.int64)
-
-    bifido_excrete = field(type=np.ndarray)
-
-    @bifido_excrete.default
-    def _bifido_excrete_factory(self):
-        return np.zeros(self.MAX_BIFIDOS, dtype=np.bool_)
 
     bifido_energy = field(type=np.ndarray)
 
@@ -198,14 +198,8 @@ class GutPython:
     desulfo_remaining_attempts = field(type=np.ndarray)
 
     @desulfo_remaining_attempts.default
-    def _desulfo_rem_attempts_factory(self):
+    def _desulfo_remaining_attempts_factory(self):
         return np.zeros(self.MAX_DESULFOS, dtype=np.int64)
-
-    desulfo_excrete = field(type=np.ndarray)
-
-    @desulfo_excrete.default
-    def _desulfo_excrete_factory(self):
-        return np.zeros(self.MAX_DESULFOS, dtype=np.bool_)
 
     desulfo_energy = field(type=np.ndarray)
 
@@ -261,14 +255,8 @@ class GutPython:
     clost_remaining_attempts = field(type=np.ndarray)
 
     @clost_remaining_attempts.default
-    def _clost_rem_attempts_factory(self):
+    def _clost_remaining_attempts_factory(self):
         return np.zeros(self.MAX_CLOSTS, dtype=np.int64)
-
-    clost_excrete = field(type=np.ndarray)
-
-    @clost_excrete.default
-    def _clost_excrete_factory(self):
-        return np.zeros(self.MAX_CLOSTS, dtype=np.bool_)
 
     clost_energy = field(type=np.ndarray)
 
@@ -324,14 +312,8 @@ class GutPython:
     bacteroid_remaining_attempts = field(type=np.ndarray)
 
     @bacteroid_remaining_attempts.default
-    def _bacteroid_rem_attempts_factory(self):
+    def _bacteroid_remaining_attempts_factory(self):
         return np.zeros(self.MAX_BACTEROIDS, dtype=np.int64)
-
-    bacteroid_excrete = field(type=np.ndarray)
-
-    @bacteroid_excrete.default
-    def _bacteroid_excrete_factory(self):
-        return np.zeros(self.MAX_BACTEROIDS, dtype=np.bool_)
 
     bacteroid_energy = field(type=np.ndarray)
 
@@ -462,12 +444,6 @@ class GutPython:
 
     ########################################
 
-    ava_metas = field(type=np.ndarray)
-
-    @ava_metas.default
-    def _ava_metas_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
-
     stuck_chance = field(type=np.ndarray)
 
     @stuck_chance.default
@@ -484,10 +460,9 @@ class GutPython:
         theta: Optional[float] = None,
         age: Optional[int] = None,
         energy: Optional[float] = None,
-        excrete: Optional[bool] = None,
         is_seed: Optional[bool] = None,
         is_stuck: Optional[bool] = None,
-        rem_attempt: Optional[int] = None,
+        rem_attempt: int = 0,
     ) -> None:
         """
         Create a Bifidobacterium.
@@ -498,7 +473,6 @@ class GutPython:
         :param rem_attempt:
         :param is_stuck:
         :param is_seed:
-        :param excrete:
         :param energy:
 
         :return:
@@ -530,7 +504,6 @@ class GutPython:
 
         self.bifido_age[self.bifido_pointer] = age
         self.bifido_energy[self.bifido_pointer] = energy
-        self.bifido_excrete[self.bifido_pointer] = excrete
         self.bifido_is_seed[self.bifido_pointer] = is_seed
         self.bifido_is_stuck[self.bifido_pointer] = is_stuck
         self.bifido_remaining_attempts[self.bifido_pointer] = rem_attempt
@@ -544,7 +517,6 @@ class GutPython:
         self.bifido_dirs[: self.num_bifidos] = self.bifido_dirs[self.bifido_mask]
         self.bifido_age[: self.num_bifidos] = self.bifido_age[self.bifido_mask]
         self.bifido_energy[: self.num_bifidos] = self.bifido_energy[self.bifido_mask]
-        self.bifido_excrete[: self.num_bifidos] = self.bifido_excrete[self.bifido_mask]
         self.bifido_is_seed[: self.num_bifidos] = self.bifido_is_seed[self.bifido_mask]
         self.bifido_is_stuck[: self.num_bifidos] = self.bifido_is_stuck[self.bifido_mask]
         self.bifido_remaining_attempts[: self.num_bifidos] = self.bifido_remaining_attempts[
@@ -583,12 +555,6 @@ class GutPython:
             mode="constant",
             constant_values=0.0,
         )
-        self.bifido_excrete = np.pad(
-            self.bifido_excrete,
-            pad_width=np.array((0, old_max_bifidos)),
-            mode="constant",
-            constant_values=False,
-        )
         self.bifido_is_seed = np.pad(
             self.bifido_is_seed,
             pad_width=np.array((0, old_max_bifidos)),
@@ -624,10 +590,9 @@ class GutPython:
         theta: Optional[float] = None,
         age: Optional[int] = None,
         energy: Optional[float] = None,
-        excrete: Optional[bool] = None,
         is_seed: Optional[bool] = None,
         is_stuck: Optional[bool] = None,
-        rem_attempt: Optional[int] = None,
+        rem_attempt: int = 0,
     ) -> None:
         """
         Create a Desulfovibro.
@@ -638,7 +603,6 @@ class GutPython:
         :param rem_attempt:
         :param is_stuck:
         :param is_seed:
-        :param excrete:
         :param energy:
 
         :return:
@@ -670,7 +634,6 @@ class GutPython:
 
         self.desulfo_age[self.desulfo_pointer] = age
         self.desulfo_energy[self.desulfo_pointer] = energy
-        self.desulfo_excrete[self.desulfo_pointer] = excrete
         self.desulfo_is_seed[self.desulfo_pointer] = is_seed
         self.desulfo_is_stuck[self.desulfo_pointer] = is_stuck
         self.desulfo_remaining_attempts[self.desulfo_pointer] = rem_attempt
@@ -684,7 +647,6 @@ class GutPython:
         self.desulfo_dirs[: self.num_desulfos] = self.desulfo_dirs[self.desulfo_mask]
         self.desulfo_age[: self.num_desulfos] = self.desulfo_age[self.desulfo_mask]
         self.desulfo_energy[: self.num_desulfos] = self.desulfo_energy[self.desulfo_mask]
-        self.desulfo_excrete[: self.num_desulfos] = self.desulfo_excrete[self.desulfo_mask]
         self.desulfo_is_seed[: self.num_desulfos] = self.desulfo_is_seed[self.desulfo_mask]
         self.desulfo_is_stuck[: self.num_desulfos] = self.desulfo_is_stuck[self.desulfo_mask]
         self.desulfo_remaining_attempts[: self.num_desulfos] = self.desulfo_remaining_attempts[
@@ -723,12 +685,6 @@ class GutPython:
             mode="constant",
             constant_values=0.0,
         )
-        self.desulfo_excrete = np.pad(
-            self.desulfo_excrete,
-            pad_width=np.array((0, old_max_desulfos)),
-            mode="constant",
-            constant_values=False,
-        )
         self.desulfo_is_seed = np.pad(
             self.desulfo_is_seed,
             pad_width=np.array((0, old_max_desulfos)),
@@ -764,10 +720,9 @@ class GutPython:
         theta: Optional[float] = None,
         age: Optional[int] = None,
         energy: Optional[float] = None,
-        excrete: Optional[bool] = None,
         is_seed: Optional[bool] = None,
         is_stuck: Optional[bool] = None,
-        rem_attempt: Optional[int] = None,
+        rem_attempt: int = 0,
     ) -> None:
         """
         Create a Clostridium.
@@ -778,7 +733,6 @@ class GutPython:
         :param rem_attempt:
         :param is_stuck:
         :param is_seed:
-        :param excrete:
         :param energy:
 
         :return:
@@ -810,7 +764,6 @@ class GutPython:
 
         self.clost_age[self.clost_pointer] = age
         self.clost_energy[self.clost_pointer] = energy
-        self.clost_excrete[self.clost_pointer] = excrete
         self.clost_is_seed[self.clost_pointer] = is_seed
         self.clost_is_stuck[self.clost_pointer] = is_stuck
         self.clost_remaining_attempts[self.clost_pointer] = rem_attempt
@@ -824,7 +777,6 @@ class GutPython:
         self.clost_dirs[: self.num_closts] = self.clost_dirs[self.clost_mask]
         self.clost_age[: self.num_closts] = self.clost_age[self.clost_mask]
         self.clost_energy[: self.num_closts] = self.clost_energy[self.clost_mask]
-        self.clost_excrete[: self.num_closts] = self.clost_excrete[self.clost_mask]
         self.clost_is_seed[: self.num_closts] = self.clost_is_seed[self.clost_mask]
         self.clost_is_stuck[: self.num_closts] = self.clost_is_stuck[self.clost_mask]
         self.clost_remaining_attempts[: self.num_closts] = self.clost_remaining_attempts[
@@ -863,12 +815,6 @@ class GutPython:
             mode="constant",
             constant_values=0.0,
         )
-        self.clost_excrete = np.pad(
-            self.clost_excrete,
-            pad_width=np.array((0, old_max_closts)),
-            mode="constant",
-            constant_values=False,
-        )
         self.clost_is_seed = np.pad(
             self.clost_is_seed,
             pad_width=np.array((0, old_max_closts)),
@@ -904,10 +850,9 @@ class GutPython:
         theta: Optional[float] = None,
         age: Optional[int] = None,
         energy: Optional[float] = None,
-        excrete: Optional[bool] = None,
         is_seed: Optional[bool] = None,
         is_stuck: Optional[bool] = None,
-        rem_attempt: Optional[int] = None,
+        rem_attempt: int = 0,
     ) -> None:
         """
         Create a Bacteroides.
@@ -918,7 +863,6 @@ class GutPython:
         :param rem_attempt:
         :param is_stuck:
         :param is_seed:
-        :param excrete:
         :param energy:
 
         :return:
@@ -952,7 +896,6 @@ class GutPython:
 
         self.bacteroid_age[self.bacteroid_pointer] = age
         self.bacteroid_energy[self.bacteroid_pointer] = energy
-        self.bacteroid_excrete[self.bacteroid_pointer] = excrete
         self.bacteroid_is_seed[self.bacteroid_pointer] = is_seed
         self.bacteroid_is_stuck[self.bacteroid_pointer] = is_stuck
         self.bacteroid_remaining_attempts[self.bacteroid_pointer] = rem_attempt
@@ -968,7 +911,6 @@ class GutPython:
         self.bacteroid_dirs[: self.num_bacteroids] = self.bacteroid_dirs[self.bacteroid_mask]
         self.bacteroid_age[: self.num_bacteroids] = self.bacteroid_age[self.bacteroid_mask]
         self.bacteroid_energy[: self.num_bacteroids] = self.bacteroid_energy[self.bacteroid_mask]
-        self.bacteroid_excrete[: self.num_bacteroids] = self.bacteroid_excrete[self.bacteroid_mask]
         self.bacteroid_is_seed[: self.num_bacteroids] = self.bacteroid_is_seed[self.bacteroid_mask]
         self.bacteroid_is_stuck[: self.num_bacteroids] = self.bacteroid_is_stuck[
             self.bacteroid_mask
@@ -1008,12 +950,6 @@ class GutPython:
             pad_width=np.array((0, old_max_bacteroids)),
             mode="constant",
             constant_values=0.0,
-        )
-        self.bacteroid_excrete = np.pad(
-            self.bacteroid_excrete,
-            pad_width=np.array((0, old_max_bacteroids)),
-            mode="constant",
-            constant_values=False,
         )
         self.bacteroid_is_seed = np.pad(
             self.bacteroid_is_seed,
@@ -1134,8 +1070,8 @@ class GutPython:
     ######################################################################
     # initialization code
 
-    def __attrs_post_init__(self):
-        self.setup()
+    # def __attrs_post_init__(self):
+    #     self.setup()
 
     def setup(self):
         #   create-bifidos (initNumBifidos * (1 - seedPercent / 100)) [
@@ -1173,7 +1109,6 @@ class GutPython:
         for idx in range(self.init_num_bifidos):
             self.create_bifido(
                 energy=100,
-                excrete=False,
                 is_seed=idx < num_seed_bifidos,
                 is_stuck=True,
                 age=np.random.randint(1000),
@@ -1213,7 +1148,6 @@ class GutPython:
         for idx in range(self.init_num_desulfos):
             self.create_desulfo(
                 energy=100,
-                excrete=False,
                 is_seed=idx < num_seed_desulfos,
                 is_stuck=True,
                 age=np.random.randint(1000),
@@ -1253,7 +1187,6 @@ class GutPython:
         for idx in range(self.init_num_closts):
             self.create_clost(
                 energy=100,
-                excrete=False,
                 is_seed=idx < num_seed_closts,
                 is_stuck=True,
                 age=np.random.randint(1000),
@@ -1293,7 +1226,6 @@ class GutPython:
         for idx in range(self.init_num_bacteroids):
             self.create_bacteroid(
                 energy=100,
-                excrete=False,
                 is_seed=idx < num_seed_bacteroids,
                 is_stuck=True,
                 age=np.random.randint(1000),
@@ -1355,7 +1287,7 @@ class GutPython:
         #   ;; Setup for stop if negative metas
         #   set negMeta false
 
-        self.neg_meta = False
+        # self.neg_meta = False
 
         #   ;; set time to zero
         #   reset-ticks
@@ -1385,7 +1317,7 @@ class GutPython:
         self.patch_eat()
         self.store_metabolites()
 
-        #   ;; make meta must be in seperate ask, sequential tasks
+        #   ;; make meta must be in separate ask, sequential tasks
         #   ask patches[
         #     makeMetabolites
         #   ]
@@ -1435,8 +1367,8 @@ class GutPython:
         #   if (count turtles > 1000000) [ stop ]
         #   if not any? turtles [ stop ] ;; stop if all turtles are dead
         # end
-        if self.neg_meta:
-            exit()
+        # if self.neg_meta:
+        #     exit()
         if self.num_bacteria > 1000000:
             exit()
         if self.num_bacteria <= 0:
@@ -1474,7 +1406,7 @@ class GutPython:
         #     ]
         #     set i (i + 1)
         #   ]
-        #   let iter 0 ;; used to limit the number of times the next while loop will occur, aribitrary
+        #   let iter 0 ;; used to limit the number of times the next while loop will occur, arbitrary
         #   ;; do the eating till no metas or not hungry
         #   while [(length(avaMetas) > 0) and any? hungryBact and iter < 100] [
         #     ;; code here to randomly select a turtle from hungryBact and then ask it to run bactEat with a random
@@ -1507,10 +1439,10 @@ class GutPython:
 
         hungry_bacteria = list(
             itertools.chain(
-                zip(itertools.repeat("bacteroid"), np.where(hungry_bacteroid_mask)),
-                zip(itertools.repeat("bifido"), np.where(hungry_bifido_mask)),
-                zip(itertools.repeat("clost"), np.where(hungry_clost_mask)),
-                zip(itertools.repeat("desulfo"), np.where(hungry_desulfo_mask)),
+                zip(itertools.repeat("bacteroid"), np.where(hungry_bacteroid_mask)[0]),
+                zip(itertools.repeat("bifido"), np.where(hungry_bifido_mask)[0]),
+                zip(itertools.repeat("clost"), np.where(hungry_clost_mask)[0]),
+                zip(itertools.repeat("desulfo"), np.where(hungry_desulfo_mask)[0]),
             )
         )
 
@@ -1555,7 +1487,7 @@ class GutPython:
                 #   ]
                 if bact_type != "desulfo":
                     return
-                loc = getattr(self, f"{bact_type}_location")[idx].astype(int)
+                loc = tuple(getattr(self, f"{bact_type}_locations")[idx].astype(int))
                 if self.cs[loc] >= 1:
                     getattr(self, f"{bact_type}_energy")[idx] += 50
                     self.cs[loc] -= 1
@@ -1587,7 +1519,7 @@ class GutPython:
                 #   ]
                 if bact_type not in {"clost", "bacteroid", "bifido"}:
                     return
-                loc = getattr(self, f"{bact_type}_location")[idx].astype(int)
+                loc = tuple(getattr(self, f"{bact_type}_locations")[idx].astype(int).T)
                 if self.fo[loc] >= 1:
                     getattr(self, f"{bact_type}_energy")[idx] += 50 if bact_type == "bifido" else 25
                     self.fo[loc] -= 1
@@ -1621,7 +1553,7 @@ class GutPython:
                 #   ]
                 if bact_type not in {"clost", "bacteroid", "bifido"}:
                     return
-                loc = getattr(self, f"{bact_type}_location")[idx].astype(int)
+                loc = tuple(getattr(self, f"{bact_type}_locations")[idx].astype(int).T)
                 if self.glucose[loc] >= 1:
                     getattr(self, f"{bact_type}_energy")[idx] += 25 if bact_type == "bifido" else 50
                     self.glucose[loc] -= 1
@@ -1655,7 +1587,7 @@ class GutPython:
                 #   ]
                 if bact_type not in {"clost", "bacteroid", "bifido"}:
                     return
-                loc = getattr(self, f"{bact_type}_location")[idx].astype(int)
+                loc = tuple(getattr(self, f"{bact_type}_locations")[idx].astype(int).T)
                 if self.inulin[loc] >= 1:
                     getattr(self, f"{bact_type}_energy")[idx] += 25
                     self.inulin[loc] -= 1
@@ -1679,7 +1611,7 @@ class GutPython:
                 #   ]
                 if bact_type != "desulfo":
                     return
-                loc = getattr(self, f"{bact_type}_location")[idx].astype(int)
+                loc = tuple(getattr(self, f"{bact_type}_locations")[idx].astype(int))
                 if self.lactate[loc] >= 1:
                     getattr(self, f"{bact_type}_energy")[idx] += 50
                     self.lactate[loc] -= 1
@@ -1716,7 +1648,7 @@ class GutPython:
                 #   ]
                 if bact_type not in {"clost", "bacteroid", "bifido"}:
                     return
-                loc = getattr(self, f"{bact_type}_location")[idx].astype(int)
+                loc = tuple(getattr(self, f"{bact_type}_locations")[idx].astype(int))
                 if self.lactose[loc] >= 1:
                     getattr(self, f"{bact_type}_energy")[idx] += 25 if bact_type == "clost" else 50
                     self.lactose[loc] -= 1
@@ -1782,7 +1714,7 @@ class GutPython:
         #   set glucose (glucose * remainFactor)
         #   set CS (CS * remainFactor)
         #
-        #   ;;The leftmost pacthes evenly split the inFlow number of metas
+        #   ;;The leftmost patches evenly split the inFlow number of metas
         #   ifelse (leftDist < flowDist)[
         #     let inFlowCoef (((min list 1 (flowDist - leftDist))) / (flowDist * span))
         #     set inulin ((inulin) + (inFlowInulin * inFlowCoef))
@@ -1807,14 +1739,14 @@ class GutPython:
         )[:, np.newaxis]
         remain_factor = 0 if self.flow_dist >= 1 else 1 - self.flow_dist
 
-        for metabolite, metabolite_prev, metabolite_reserve, metabolite_inflow in {
+        for metabolite, metabolite_prev, metabolite_reserve, metabolite_inflow in [
             (self.inulin, self.inulin_prev, self.inulin_reserve, self.inulin_inflow),
             (self.fo, self.fo_prev, self.fo_reserve, self.fo_inflow),
             (self.lactose, self.lactose_prev, self.lactose_reserve, self.lactose_inflow),
             (self.lactate, self.lactate_prev, self.lactate_reserve, self.lactate_inflow),
             (self.glucose, self.glucose_prev, self.glucose_reserve, self.glucose_inflow),
             (self.cs, self.cs_prev, self.cs_reserve, self.cs_inflow),
-        }:
+        ]:
             metabolite += metabolite_reserve
             metabolite *= remain_factor
 
@@ -1824,6 +1756,10 @@ class GutPython:
                 metabolite[upper_flow_dist:, :] += metabolite_prev[:-upper_flow_dist, :] * (
                     1 - remain_factor
                 )
+            elif lower_flow_dist == 0:
+                metabolite[upper_flow_dist:, :] = metabolite_prev[:-upper_flow_dist, :] * frac * (
+                    1 - remain_factor
+                ) + metabolite_prev[1:, :] * (1 - frac) * (1 - remain_factor)
             else:
                 metabolite[upper_flow_dist:, :] = metabolite_prev[:-upper_flow_dist, :] * frac * (
                     1 - remain_factor
@@ -1893,15 +1829,25 @@ class GutPython:
         # flowMove
         movable_bifidos = self.bifido_mask & ~self.bifido_is_stuck & ~self.bifido_is_seed
         self.bifido_locations[movable_bifidos, 0] += self.flow_dist * self.bifido_flow_const
-        self.bifido_excrete[self.bifido_locations[movable_bifidos, 0] >= self.GRID_WIDTH + 0.5] = (
-            True
-        )
+
+        # excrete
+        bifido_excrete = (self.bifido_locations[:, 0] >= self.GRID_WIDTH) & self.bifido_mask
+        self.bifido_mask[bifido_excrete] = False
+        self.num_bifidos -= np.sum(bifido_excrete)
+
+        # deathBifidos
+        to_kill = self.bifido_mask & (self.bifido_energy <= 0)
+        self.bifido_mask[to_kill] = False
+        self.num_bifidos -= np.sum(to_kill)
 
         # checkStuck
+        bifido_locs = tuple(
+            np.minimum(self.bifido_locations.astype(np.int64), np.array(self.geometry) - 1).T
+        )
         sticking_bifidos = (
             self.bifido_mask
             & ~self.bifido_is_stuck
-            & (np.random.rand(self.bifido_is_stuck.shape[0]) < (self.stuck_chance / 100.0))
+            & (np.random.rand(*self.bifido_mask.shape) < (self.stuck_chance[bifido_locs] / 100.0))
         )
         self.bifido_is_stuck[sticking_bifidos] = True
         unsticking_bifidos = (
@@ -1910,12 +1856,6 @@ class GutPython:
             & (np.random.rand(self.bifido_is_stuck.shape[0]) < (self.unstuck_chance / 100.0))
         )
         self.bifido_is_stuck[unsticking_bifidos] = False
-
-        # deathBifidos
-        to_kill = self.bifido_mask & (self.bifido_energy <= 0 | self.bifido_excrete)
-        num_to_kill = np.sum(to_kill)
-        self.bifido_mask[to_kill] = False
-        self.num_bifidos -= num_to_kill
 
         # reproduce
         to_reproduce = (
@@ -1963,29 +1903,36 @@ class GutPython:
         # flowMove
         movable_desulfos = self.desulfo_mask & ~self.desulfo_is_stuck & ~self.desulfo_is_seed
         self.desulfo_locations[movable_desulfos, 0] += self.flow_dist * self.desulfo_flow_const
-        self.desulfo_excrete[
-            self.desulfo_locations[movable_desulfos, 0] >= self.GRID_WIDTH + 0.5
-        ] = True
+
+        # excrete
+        desulfo_excrete = (self.desulfo_locations[:, 0] >= self.GRID_WIDTH) & self.desulfo_mask
+        self.desulfo_mask[desulfo_excrete] = False
+        self.num_desulfos -= np.sum(desulfo_excrete)
+
+        # deathDesulfos
+        to_kill = self.desulfo_mask & (self.desulfo_energy <= 0)
+        self.desulfo_mask[to_kill] = False
+        self.num_desulfos -= np.sum(to_kill)
 
         # checkStuck
+        desulfo_locs = tuple(
+            np.minimum(self.desulfo_locations.astype(np.int64), np.array(self.geometry) - 1).T
+        )
         sticking_desulfos = (
             self.desulfo_mask
             & ~self.desulfo_is_stuck
-            & (np.random.rand(self.desulfo_is_stuck.shape[0]) < (self.stuck_chance / 100.0))
+            & (
+                np.random.rand(*self.desulfo_is_stuck.shape)
+                < (self.stuck_chance[desulfo_locs] / 100.0)
+            )
         )
         self.desulfo_is_stuck[sticking_desulfos] = True
         unsticking_desulfos = (
             self.desulfo_mask
             & self.desulfo_is_stuck
-            & (np.random.rand(self.desulfo_is_stuck.shape[0]) < (self.unstuck_chance / 100.0))
+            & (np.random.rand(*self.desulfo_is_stuck.shape) < (self.unstuck_chance / 100.0))
         )
         self.desulfo_is_stuck[unsticking_desulfos] = False
-
-        # deathDesulfos
-        to_kill = self.desulfo_mask & (self.desulfo_energy <= 0 | self.desulfo_excrete)
-        num_to_kill = np.sum(to_kill)
-        self.desulfo_mask[to_kill] = False
-        self.num_desulfos -= num_to_kill
 
         # reproduce
         to_reproduce = (
@@ -2025,27 +1972,33 @@ class GutPython:
         # flowMove
         movable_closts = self.clost_mask & ~self.clost_is_stuck & ~self.clost_is_seed
         self.clost_locations[movable_closts, 0] += self.flow_dist * self.clost_flow_const
-        self.clost_excrete[self.clost_locations[movable_closts, 0] >= self.GRID_WIDTH + 0.5] = True
+
+        # excrete
+        clost_excrete = (self.clost_locations[:, 0] >= self.GRID_WIDTH) & self.clost_mask
+        self.clost_mask[clost_excrete] = False
+        self.num_closts -= np.sum(clost_excrete)
+
+        # deathClosts
+        to_kill = self.clost_mask & (self.clost_energy <= 0)
+        self.clost_mask[to_kill] = False
+        self.num_closts -= np.sum(to_kill)
 
         # checkStuck
+        clost_locs = tuple(
+            np.minimum(self.clost_locations.astype(np.int64), np.array(self.geometry) - 1).T
+        )
         sticking_closts = (
             self.clost_mask
             & ~self.clost_is_stuck
-            & (np.random.rand(self.clost_is_stuck.shape[0]) < (self.stuck_chance / 100.0))
+            & (np.random.rand(*self.clost_mask.shape) < (self.stuck_chance[clost_locs] / 100.0))
         )
         self.clost_is_stuck[sticking_closts] = True
         unsticking_closts = (
             self.clost_mask
             & self.clost_is_stuck
-            & (np.random.rand(self.clost_is_stuck.shape[0]) < (self.unstuck_chance / 100.0))
+            & (np.random.rand(*self.clost_mask.shape) < (self.unstuck_chance / 100.0))
         )
         self.clost_is_stuck[unsticking_closts] = False
-
-        # deathClosts
-        to_kill = self.clost_mask & (self.clost_energy <= 0 | self.clost_excrete)
-        num_to_kill = np.sum(to_kill)
-        self.clost_mask[to_kill] = False
-        self.num_closts -= num_to_kill
 
         # reproduce
         to_reproduce = (
@@ -2076,7 +2029,7 @@ class GutPython:
         #     flowMove
         #   ;;randMove
         #     checkStuck
-        #     deathbacteroides
+        #     deathBacteroides
         #     if (age mod bacteroidDoub = 0 and age != 0)[
         #       reproduceBact
         #     ]
@@ -2091,15 +2044,30 @@ class GutPython:
         self.bacteroid_locations[movable_bacteroids, 0] += (
             self.flow_dist * self.bacteroid_flow_const
         )
-        self.bacteroid_excrete[
-            self.bacteroid_locations[movable_bacteroids, 0] >= self.GRID_WIDTH + 0.5
-        ] = True
+
+        # excrete
+        bacteroid_excrete = (
+            self.bacteroid_locations[:, 0] >= self.GRID_WIDTH
+        ) & self.bacteroid_mask
+        self.bacteroid_mask[bacteroid_excrete] = False
+        self.num_bacteroids -= np.sum(bacteroid_excrete)
+
+        # deathBacteroids
+        to_kill = self.bacteroid_mask & (self.bacteroid_energy <= 0)
+        self.bacteroid_mask[to_kill] = False
+        self.num_bacteroids -= np.sum(to_kill)
 
         # checkStuck
+        bacteroid_locs = tuple(
+            np.minimum(self.bacteroid_locations.astype(np.int64), np.array(self.geometry) - 1).T
+        )
         sticking_bacteroids = (
             self.bacteroid_mask
             & ~self.bacteroid_is_stuck
-            & (np.random.rand(self.bacteroid_is_stuck.shape[0]) < (self.stuck_chance / 100.0))
+            & (
+                np.random.rand(self.bacteroid_is_stuck.shape[0])
+                < (self.stuck_chance[bacteroid_locs] / 100.0)
+            )
         )
         self.bacteroid_is_stuck[sticking_bacteroids] = True
         unsticking_bacteroids = (
@@ -2108,12 +2076,6 @@ class GutPython:
             & (np.random.rand(self.bacteroid_is_stuck.shape[0]) < (self.unstuck_chance / 100.0))
         )
         self.bacteroid_is_stuck[unsticking_bacteroids] = False
-
-        # deathbacteroids
-        to_kill = self.bacteroid_mask & (self.bacteroid_energy <= 0 | self.bacteroid_excrete)
-        num_to_kill = np.sum(to_kill)
-        self.bacteroid_mask[to_kill] = False
-        self.num_bacteroids -= num_to_kill
 
         # reproduce
         to_reproduce = (
@@ -2151,8 +2113,26 @@ class GutPython:
         #     ]
         #   ]
         # end
-        pass
-        # TODO: implement
+
+        self.bacteroid_is_seed[
+            self.bacteroid_is_stuck
+            & (np.random.rand(self.bacteroid_mask.shape[0]) < (self.seed_chance / 100.0))
+        ] = True
+
+        self.bifido_is_seed[
+            self.bifido_is_stuck
+            & (np.random.rand(self.bifido_mask.shape[0]) < (self.seed_chance / 100.0))
+        ] = True
+
+        self.clost_is_seed[
+            self.clost_is_stuck
+            & (np.random.rand(self.clost_mask.shape[0]) < (self.seed_chance / 100.0))
+        ] = True
+
+        self.desulfo_is_seed[
+            self.desulfo_is_stuck
+            & (np.random.rand(self.desulfo_mask.shape[0]) < (self.seed_chance / 100.0))
+        ] = True
 
     def bact_in(self):
         # to bactIn
@@ -2161,8 +2141,106 @@ class GutPython:
         #     inConc
         #   ]
         # end
-        pass
-        # TODO: implement
+
+        if self.ticks % self.tick_in_flow != 0:
+            return
+
+        # to inConc
+        # ;; controls the amount of each type of bacteria flowing in to the simulation
+        # ;; similar to the code in go, but bacteria are now placed at only in the first column
+        #
+        #   create-bifidos inConcBifidos [
+        #     set color blue
+        #     set size 1
+        #     set label-color blue - 2
+        #     set energy 100
+        #     set excrete false
+        #     set isSeed false
+        #     set isStuck false
+        #     set age random 1000
+        # 	  set flowConst 1
+        # 	  set doubConst 1
+        #     setxy min-pxcor - 0.5 random-ycor
+        #   ]
+
+        for _ in range(self.in_conc_bifidos):
+            self.create_bifido(
+                energy=100,
+                is_seed=False,
+                is_stuck=False,
+                age=np.random.randint(1000),
+                location=[0.0, np.random.rand()],
+            )
+
+        #   create-desulfos inConcDesulfos [
+        #     set color green
+        #     set size 1
+        #     set energy 100
+        #     set excrete false
+        #     set isSeed false
+        #     set age random 1000
+        # 	  set flowConst 1
+        # 	  set doubConst 1
+        #     setxy min-pxcor - 0.5 random-ycor
+        #
+        #   ]
+        #
+
+        for _ in range(self.in_conc_desulfos):
+            self.create_desulfo(
+                energy=100,
+                is_seed=False,
+                # is_stuck=False,
+                age=np.random.randint(1000),
+                location=[0.0, np.random.rand()],
+            )
+
+        #   create-closts inConcClosts [
+        #     set color red
+        #     set size 1
+        #     set energy 100
+        #     set excrete false
+        #     set isSeed false
+        #     set isStuck false
+        #     set age random 1000
+        # 	  set flowConst 1
+        # 	  set doubConst 1
+        #     setxy min-pxcor - 0.5 random-ycor
+        #
+        #   ]
+
+        for _ in range(self.in_conc_closts):
+            self.create_clost(
+                energy=100,
+                is_seed=False,
+                is_stuck=False,
+                age=np.random.randint(1000),
+                location=[0.0, np.random.rand()],
+            )
+
+        #   create-bacteroides inConcBacteroides [
+        #     set color grey
+        #     set size 1
+        #     set energy 100
+        #     set excrete false
+        #     set isSeed false
+        #     set isStuck false
+        #     set age random 1000
+        # 	  set flowConst 1
+        # 	  set doubConst 1
+        #     setxy min-pxcor - 0.5 random-ycor
+        #
+        #   ]
+        # end
+
+        for _ in range(self.in_conc_bacteroids):
+            self.create_bacteroid(
+                energy=100,
+                is_seed=False,
+                is_stuck=False,
+                age=np.random.randint(1000),
+                location=[0.0, np.random.rand()],
+            )
 
     def set_true_abs(self):
         # to setTrueAbs
@@ -2201,25 +2279,39 @@ class GutPython:
     def set_stuck_chance(self):
         occupancy = np.zeros(self.geometry, dtype=np.int64)
 
+        geometry_bounds = np.array(self.geometry)
+
         bifido_patches = self.bifido_locations[self.bifido_mask, :].astype(np.int64)
         # TODO: vectorize. need to check what happens with repeat locs using
         #  occupancy[tuple(bifido_patches.T)] += 1
         for idx in range(bifido_patches.shape[0]):
-            occupancy[tuple(bifido_patches[idx])] += 1
+            if np.all(bifido_patches[idx] < geometry_bounds):
+                occupancy[tuple(bifido_patches[idx])] += 1
 
         desulfo_patches = self.desulfo_locations[self.desulfo_mask, :].astype(np.int64)
         for idx in range(desulfo_patches.shape[0]):
-            occupancy[tuple(desulfo_patches[idx])] += 1
+            if np.all(desulfo_patches[idx] < geometry_bounds):
+                occupancy[tuple(desulfo_patches[idx])] += 1
 
         clost_patches = self.clost_locations[self.clost_mask, :].astype(np.int64)
         for idx in range(clost_patches.shape[0]):
-            occupancy[tuple(clost_patches[idx])] += 1
+            if np.all(clost_patches[idx] < geometry_bounds):
+                occupancy[tuple(clost_patches[idx])] += 1
 
         bacteroid_patches = self.bacteroid_locations[self.bacteroid_mask, :].astype(np.int64)
         for idx in range(bacteroid_patches.shape[0]):
-            occupancy[tuple(bacteroid_patches[idx])] += 1
+            if np.all(bacteroid_patches[idx] < geometry_bounds):
+                occupancy[tuple(bacteroid_patches[idx])] += 1
 
         self.stuck_chance[:, :] = self.max_stuck_chance * (
             1 - occupancy / (self.mid_stuck_conc + occupancy)
         )
         self.stuck_chance[self.stuck_chance < self.low_stuck_bound] = 0
+
+
+if __name__ == "__main__":
+
+    gp = GutPython()
+    gp.setup()
+    for _ in range(10_000):
+        gp.go()
