@@ -21,6 +21,9 @@ dependencies = [
     "numpy",
     "h5py",
     "attrs",
+    "tqdm",
+    "jupyter",
+    "matplotlib",
 ]
 
 [project.scripts]

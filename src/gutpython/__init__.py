@@ -3,8 +3,10 @@ import math
 from typing import Final, Iterable, Optional, Tuple
 
 import h5py
+import matplotlib.pyplot as plt
 import numpy as np
 from attr import define, field, fields
+from matplotlib import markers
 
 BIG_NUM = 3000
 MEDIUM_NUM = 200
@@ -59,7 +61,7 @@ class GutPython:
     bacteroid_doub: int = field(default=330)
     clost_doub: int = field(default=330)
 
-    tick_in_flow: int = field(default=1)  # TODO: value?
+    tick_in_flow: int = field(default=480)
     in_conc_bacteroids: int = field(default=0)
     in_conc_bifidos: int = field(default=0)
     in_conc_closts: int = field(default=0)
@@ -114,12 +116,6 @@ class GutPython:
     def _bifido_locations_factory(self):
         return np.zeros((self.MAX_BIFIDOS, 2), dtype=np.float64)
 
-    bifido_dirs = field(type=np.ndarray)
-
-    @bifido_dirs.default
-    def _bifido_dirs_factory(self):
-        return np.zeros(self.MAX_BIFIDOS, dtype=np.float64)
-
     bifido_age = field(type=np.ndarray)
 
     @bifido_age.default
@@ -170,12 +166,6 @@ class GutPython:
     @desulfo_locations.default
     def _desulfo_locations_factory(self):
         return np.zeros((self.MAX_DESULFOS, 2), dtype=np.float64)
-
-    desulfo_dirs = field(type=np.ndarray)
-
-    @desulfo_dirs.default
-    def _desulfo_dirs_factory(self):
-        return np.zeros(self.MAX_DESULFOS, dtype=np.float64)
 
     desulfo_age = field(type=np.ndarray)
 
@@ -228,12 +218,6 @@ class GutPython:
     def _clost_locations_factory(self):
         return np.zeros((self.MAX_CLOSTS, 2), dtype=np.float64)
 
-    clost_dirs = field(type=np.ndarray)
-
-    @clost_dirs.default
-    def _clost_dirs_factory(self):
-        return np.zeros(self.MAX_CLOSTS, dtype=np.float64)
-
     clost_age = field(type=np.ndarray)
 
     @clost_age.default
@@ -284,12 +268,6 @@ class GutPython:
     @bacteroid_locations.default
     def _bacteroid_locations_factory(self):
         return np.zeros((self.MAX_BACTEROIDS, 2), dtype=np.float64)
-
-    bacteroid_dirs = field(type=np.ndarray)
-
-    @bacteroid_dirs.default
-    def _bacteroid_dirs_factory(self):
-        return np.zeros(self.MAX_BACTEROIDS, dtype=np.float64)
 
     bacteroid_age = field(type=np.ndarray)
 
@@ -457,7 +435,6 @@ class GutPython:
         self,
         *,
         location: Optional[Iterable] = None,
-        theta: Optional[float] = None,
         age: Optional[int] = None,
         energy: Optional[float] = None,
         is_seed: Optional[bool] = None,
@@ -468,7 +445,6 @@ class GutPython:
         Create a Bifidobacterium.
 
         :param location: location to create the bifidobacterium (optional, random if omitted)
-        :param theta: direction of bifidobacterium movement in radians (optional, random if omitted)
         :param age:
         :param rem_attempt:
         :param is_stuck:
@@ -496,12 +472,6 @@ class GutPython:
         else:
             self.bifido_locations[self.bifido_pointer, :] = np.array(location).astype(np.float64)
 
-        if theta is None:
-            theta = 2 * np.pi * np.random.rand() - np.pi
-        else:
-            theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
-        self.bifido_dirs[self.bifido_pointer] = theta
-
         self.bifido_age[self.bifido_pointer] = age
         self.bifido_energy[self.bifido_pointer] = energy
         self.bifido_is_seed[self.bifido_pointer] = is_seed
@@ -514,7 +484,6 @@ class GutPython:
 
     def compact_bifido_arrays(self):
         self.bifido_locations[: self.num_bifidos] = self.bifido_locations[self.bifido_mask]
-        self.bifido_dirs[: self.num_bifidos] = self.bifido_dirs[self.bifido_mask]
         self.bifido_age[: self.num_bifidos] = self.bifido_age[self.bifido_mask]
         self.bifido_energy[: self.num_bifidos] = self.bifido_energy[self.bifido_mask]
         self.bifido_is_seed[: self.num_bifidos] = self.bifido_is_seed[self.bifido_mask]
@@ -536,12 +505,6 @@ class GutPython:
             pad_width=np.array(((0, old_max_bifidos), (0, 0))),
             mode="constant",
             constant_values=(0, 0),
-        )
-        self.bifido_dirs = np.pad(
-            self.bifido_dirs,
-            pad_width=np.array((0, old_max_bifidos)),
-            mode="constant",
-            constant_values=0.0,
         )
         self.bifido_age = np.pad(
             self.bifido_age,
@@ -587,7 +550,6 @@ class GutPython:
         self,
         *,
         location: Optional[Iterable] = None,
-        theta: Optional[float] = None,
         age: Optional[int] = None,
         energy: Optional[float] = None,
         is_seed: Optional[bool] = None,
@@ -598,7 +560,6 @@ class GutPython:
         Create a Desulfovibro.
 
         :param location: location to create the desulfovibro (optional, random if omitted)
-        :param theta: direction of desulfovibro movement in radians (optional, random if omitted)
         :param age:
         :param rem_attempt:
         :param is_stuck:
@@ -626,12 +587,6 @@ class GutPython:
         else:
             self.desulfo_locations[self.desulfo_pointer, :] = np.array(location).astype(np.float64)
 
-        if theta is None:
-            theta = 2 * np.pi * np.random.rand() - np.pi
-        else:
-            theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
-        self.desulfo_dirs[self.desulfo_pointer] = theta
-
         self.desulfo_age[self.desulfo_pointer] = age
         self.desulfo_energy[self.desulfo_pointer] = energy
         self.desulfo_is_seed[self.desulfo_pointer] = is_seed
@@ -644,7 +599,6 @@ class GutPython:
 
     def compact_desulfo_arrays(self):
         self.desulfo_locations[: self.num_desulfos] = self.desulfo_locations[self.desulfo_mask]
-        self.desulfo_dirs[: self.num_desulfos] = self.desulfo_dirs[self.desulfo_mask]
         self.desulfo_age[: self.num_desulfos] = self.desulfo_age[self.desulfo_mask]
         self.desulfo_energy[: self.num_desulfos] = self.desulfo_energy[self.desulfo_mask]
         self.desulfo_is_seed[: self.num_desulfos] = self.desulfo_is_seed[self.desulfo_mask]
@@ -666,12 +620,6 @@ class GutPython:
             pad_width=np.array(((0, old_max_desulfos), (0, 0))),
             mode="constant",
             constant_values=(0, 0),
-        )
-        self.desulfo_dirs = np.pad(
-            self.desulfo_dirs,
-            pad_width=np.array((0, old_max_desulfos)),
-            mode="constant",
-            constant_values=0.0,
         )
         self.desulfo_age = np.pad(
             self.desulfo_age,
@@ -717,7 +665,6 @@ class GutPython:
         self,
         *,
         location: Optional[Iterable] = None,
-        theta: Optional[float] = None,
         age: Optional[int] = None,
         energy: Optional[float] = None,
         is_seed: Optional[bool] = None,
@@ -728,7 +675,6 @@ class GutPython:
         Create a Clostridium.
 
         :param location: location to create the clostridium (optional, random if omitted)
-        :param theta: direction of clostridium movement in radians (optional, random if omitted)
         :param age:
         :param rem_attempt:
         :param is_stuck:
@@ -756,12 +702,6 @@ class GutPython:
         else:
             self.clost_locations[self.clost_pointer, :] = np.array(location).astype(np.float64)
 
-        if theta is None:
-            theta = 2 * np.pi * np.random.rand() - np.pi
-        else:
-            theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
-        self.clost_dirs[self.clost_pointer] = theta
-
         self.clost_age[self.clost_pointer] = age
         self.clost_energy[self.clost_pointer] = energy
         self.clost_is_seed[self.clost_pointer] = is_seed
@@ -774,7 +714,6 @@ class GutPython:
 
     def compact_clost_arrays(self):
         self.clost_locations[: self.num_closts] = self.clost_locations[self.clost_mask]
-        self.clost_dirs[: self.num_closts] = self.clost_dirs[self.clost_mask]
         self.clost_age[: self.num_closts] = self.clost_age[self.clost_mask]
         self.clost_energy[: self.num_closts] = self.clost_energy[self.clost_mask]
         self.clost_is_seed[: self.num_closts] = self.clost_is_seed[self.clost_mask]
@@ -796,12 +735,6 @@ class GutPython:
             pad_width=np.array(((0, old_max_closts), (0, 0))),
             mode="constant",
             constant_values=(0, 0),
-        )
-        self.clost_dirs = np.pad(
-            self.clost_dirs,
-            pad_width=np.array((0, old_max_closts)),
-            mode="constant",
-            constant_values=0.0,
         )
         self.clost_age = np.pad(
             self.clost_age,
@@ -847,7 +780,6 @@ class GutPython:
         self,
         *,
         location: Optional[Iterable] = None,
-        theta: Optional[float] = None,
         age: Optional[int] = None,
         energy: Optional[float] = None,
         is_seed: Optional[bool] = None,
@@ -858,7 +790,6 @@ class GutPython:
         Create a Bacteroides.
 
         :param location: location to create the bacteroides (optional, random if omitted)
-        :param theta: direction of bacteroides movement in radians (optional, random if omitted)
         :param age:
         :param rem_attempt:
         :param is_stuck:
@@ -888,12 +819,6 @@ class GutPython:
                 np.float64
             )
 
-        if theta is None:
-            theta = 2 * np.pi * np.random.rand() - np.pi
-        else:
-            theta = ((theta + np.pi) % (2 * np.pi)) - np.pi
-        self.bacteroid_dirs[self.bacteroid_pointer] = theta
-
         self.bacteroid_age[self.bacteroid_pointer] = age
         self.bacteroid_energy[self.bacteroid_pointer] = energy
         self.bacteroid_is_seed[self.bacteroid_pointer] = is_seed
@@ -908,7 +833,6 @@ class GutPython:
         self.bacteroid_locations[: self.num_bacteroids] = self.bacteroid_locations[
             self.bacteroid_mask
         ]
-        self.bacteroid_dirs[: self.num_bacteroids] = self.bacteroid_dirs[self.bacteroid_mask]
         self.bacteroid_age[: self.num_bacteroids] = self.bacteroid_age[self.bacteroid_mask]
         self.bacteroid_energy[: self.num_bacteroids] = self.bacteroid_energy[self.bacteroid_mask]
         self.bacteroid_is_seed[: self.num_bacteroids] = self.bacteroid_is_seed[self.bacteroid_mask]
@@ -932,12 +856,6 @@ class GutPython:
             pad_width=np.array(((0, old_max_bacteroids), (0, 0))),
             mode="constant",
             constant_values=(0, 0),
-        )
-        self.bacteroid_dirs = np.pad(
-            self.bacteroid_dirs,
-            pad_width=np.array((0, old_max_bacteroids)),
-            mode="constant",
-            constant_values=0.0,
         )
         self.bacteroid_age = np.pad(
             self.bacteroid_age,
@@ -1681,14 +1599,6 @@ class GutPython:
         # ;; Runs through all the metabolites and makes them, and moves them.
         #   let frac (flowDist - (floor( flowDist )))
 
-        upper_flow_dist: int = math.ceil(self.flow_dist)
-        lower_flow_dist: int = math.floor(self.flow_dist)
-        frac: float = self.flow_dist - lower_flow_dist
-
-        #   let span ((max-pycor - min-pycor) + 1)
-
-        span: int = self.GRID_HEIGHT
-
         #   let leftDist (pxcor - min-pxcor)
         #
         #   if ((inulin < 0) or (CS < 0) or (FO < 0) or (lactose < 0) or (lactate < 0) or (glucose < 0)) [
@@ -1734,10 +1644,9 @@ class GutPython:
         # 			set inulin (1000)
         # 		]
 
-        in_flow_coef = np.clip(
-            (self.flow_dist - np.arange(upper_flow_dist)) / (self.flow_dist * span), 0, 1
-        )[:, np.newaxis]
-        remain_factor = 0 if self.flow_dist >= 1 else 1 - self.flow_dist
+        lower_flow_dist: int = math.floor(self.flow_dist)
+        upper_flow_dist: int = lower_flow_dist + 1
+        frac = self.flow_dist - lower_flow_dist
 
         for metabolite, metabolite_prev, metabolite_reserve, metabolite_inflow in [
             (self.inulin, self.inulin_prev, self.inulin_reserve, self.inulin_inflow),
@@ -1748,22 +1657,25 @@ class GutPython:
             (self.cs, self.cs_prev, self.cs_reserve, self.cs_inflow),
         ]:
             metabolite += metabolite_reserve
-            metabolite *= remain_factor
 
-            metabolite[:upper_flow_dist, :] += in_flow_coef * metabolite_inflow
+            # amount per patch. (i.e. evenly distributed vertically, per unit length in horizontal direction)
+            metabolite_inflow_amt_per_patch = metabolite_inflow / (
+                self.geometry[1] * self.flow_dist
+            )
 
-            if frac == 0.0:
-                metabolite[upper_flow_dist:, :] += metabolite_prev[:-upper_flow_dist, :] * (
-                    1 - remain_factor
+            # with the
+            if frac > 0.0:
+                metabolite[upper_flow_dist:, :] = metabolite[
+                    :-upper_flow_dist, :
+                ] * frac + metabolite[1:-lower_flow_dist, :] * (1 - frac)
+                metabolite[lower_flow_dist, :] = (
+                    metabolite[0, :] * (1 - frac) + metabolite_inflow_amt_per_patch * frac
                 )
-            elif lower_flow_dist == 0:
-                metabolite[upper_flow_dist:, :] = metabolite_prev[:-upper_flow_dist, :] * frac * (
-                    1 - remain_factor
-                ) + metabolite_prev[1:, :] * (1 - frac) * (1 - remain_factor)
             else:
-                metabolite[upper_flow_dist:, :] = metabolite_prev[:-upper_flow_dist, :] * frac * (
-                    1 - remain_factor
-                ) + metabolite_prev[1:-lower_flow_dist, :] * (1 - frac) * (1 - remain_factor)
+                metabolite[lower_flow_dist:, :] = metabolite[:-lower_flow_dist, :]
+
+            metabolite[:lower_flow_dist, :] = metabolite_inflow_amt_per_patch
+
             np.clip(metabolite, 0, 1000, out=metabolite)
             metabolite[metabolite < 0.001] = 0
 
@@ -2307,6 +2219,85 @@ class GutPython:
             1 - occupancy / (self.mid_stuck_conc + occupancy)
         )
         self.stuck_chance[self.stuck_chance < self.low_stuck_bound] = 0
+
+    def plot_agents(self, ax: plt.Axes, *, base_zorder: int = -1):
+        """
+        Plot the agents
+        :param ax: Axes on which to plot the agents
+        :param base_zorder:
+        :return:
+        """
+        ax.clear()
+
+        # bifidobacteria
+        ax.scatter(
+            *self.bifido_locations[self.bifido_mask, :].T,
+            color="green",
+            marker="o",
+            zorder=base_zorder + 1,
+        )
+
+        # desulfovibro
+        ax.scatter(
+            *self.desulfo_locations[self.desulfo_mask, :].T,
+            color="orange",
+            marker="o",
+            zorder=base_zorder + 1,
+        )
+
+        # clostridia
+        ax.scatter(
+            *self.clost_locations[self.clost_mask, :].T,
+            color="lightblue",
+            marker="v",
+            zorder=base_zorder + 1,
+        )
+
+        # bacteroides
+        ax.scatter(
+            *self.bacteroid_locations[self.bacteroid_mask, :].T,
+            color="pink",
+            marker=markers.MarkerStyle("s", fillstyle="none"),
+            zorder=base_zorder + 1,
+        )
+
+        ax.set_xlim(0, self.geometry[0])
+        ax.set_ylim(0, self.geometry[1])
+
+    def plot_field(self, ax: plt.Axes, *, field_name: str, field_max: Optional[float] = None):
+        """
+        Plot one of the molecular fields.
+
+        :param ax: The axis to plot upon.
+        :param field_name: which field to plot
+        :param field_max: maximum value the field is expected to take
+        :return:
+        """
+        ax.clear()
+        assert field_name in {
+            "glucose",
+            "fo",
+            "lactose",
+            "lactate",
+            "inulin",
+        }, "Unknown field!"
+        field_array = getattr(self, field_name)
+
+        if field_max is not None:
+            ax.imshow(
+                field_array.T,
+                vmin=0,
+                vmax=field_max,
+                origin="lower",
+                extent=(0.0, field_array.shape[0], 0.0, field_array.shape[1]),
+            )
+        else:
+            ax.imshow(
+                field_array.T,
+                vmin=0,
+                origin="lower",
+                extent=(0.0, field_array.shape[0], 0.0, field_array.shape[1]),
+            )
 
 
 if __name__ == "__main__":
