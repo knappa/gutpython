@@ -1644,18 +1644,25 @@ class GutPython:
                 self.geometry[1] * self.flow_dist
             )
 
-            # with the
             if frac > 0.0:
-                metabolite[upper_flow_dist:, :] = metabolite[
-                    :-upper_flow_dist, :
-                ] * frac + metabolite[1:-lower_flow_dist, :] * (1 - frac)
-                metabolite[lower_flow_dist, :] = (
-                    metabolite[0, :] * (1 - frac) + metabolite_inflow_amt_per_patch * frac
-                )
+                if lower_flow_dist == 0:
+                    metabolite[1:, :] = frac * metabolite[:-1, :] + (1 - frac) * metabolite[1:, :]
+                    metabolite[0, :] = (
+                        metabolite[0, :] * (1 - frac) + metabolite_inflow_amt_per_patch * frac
+                    )
+                else:
+                    metabolite[upper_flow_dist:, :] = (
+                        frac * metabolite[:-upper_flow_dist, :]
+                        + (1 - frac) * metabolite[1:-lower_flow_dist, :]
+                    )
+                    metabolite[lower_flow_dist, :] = (
+                        metabolite[0, :] * (1 - frac) + metabolite_inflow_amt_per_patch * frac
+                    )
             else:
                 metabolite[lower_flow_dist:, :] = metabolite[:-lower_flow_dist, :]
 
-            metabolite[:lower_flow_dist, :] = metabolite_inflow_amt_per_patch
+            if lower_flow_dist > 0:
+                metabolite[:lower_flow_dist, :] = metabolite_inflow_amt_per_patch
 
             np.clip(metabolite, 0, 1000, out=metabolite)
             metabolite[metabolite < 0.001] = 0
