@@ -6,11 +6,9 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 from attr import define, field, fields
-from matplotlib import markers
 
 BIG_NUM = 3000
 MEDIUM_NUM = 200
-VERBOSE = False
 
 
 @define(kw_only=True)
@@ -21,7 +19,6 @@ class GutPython:
     MAX_DESULFOS: int = field(default=MEDIUM_NUM)
     MAX_CLOSTS: int = field(default=MEDIUM_NUM)
     MAX_BACTEROIDS: int = field(default=MEDIUM_NUM)
-    HARD_BOUND: bool = field(default=True)
 
     # globals
     #   [ trueAbsorption negMeta testState result
@@ -453,10 +450,6 @@ class GutPython:
 
         :return:
         """
-        if self.num_bifidos >= self.GRID_WIDTH * self.GRID_HEIGHT:
-            if VERBOSE:
-                print("Refusing to create a bifidobacterium when there is no room for one.")
-            return
 
         # make sure there is space
         if self.bifido_pointer >= self.MAX_BIFIDOS:
@@ -568,10 +561,6 @@ class GutPython:
 
         :return:
         """
-        if self.num_desulfos >= self.GRID_WIDTH * self.GRID_HEIGHT:
-            if VERBOSE:
-                print("Refusing to create a desulfovibro when there is no room for one.")
-            return
 
         # make sure there is space
         if self.desulfo_pointer >= self.MAX_DESULFOS:
@@ -683,10 +672,6 @@ class GutPython:
 
         :return:
         """
-        if self.num_closts >= self.GRID_WIDTH * self.GRID_HEIGHT:
-            if VERBOSE:
-                print("Refusing to create a clostridium when there is no room for one.")
-            return
 
         # make sure there is space
         if self.clost_pointer >= self.MAX_CLOSTS:
@@ -798,10 +783,6 @@ class GutPython:
 
         :return:
         """
-        if self.num_bacteroids >= self.GRID_WIDTH * self.GRID_HEIGHT:
-            if VERBOSE:
-                print("Refusing to create a bacteroides when there is no room for one.")
-            return
 
         # make sure there is space
         if self.bacteroid_pointer >= self.MAX_BACTEROIDS:
@@ -2232,32 +2213,36 @@ class GutPython:
         # bifidobacteria
         ax.scatter(
             *self.bifido_locations[self.bifido_mask, :].T,
-            color="green",
+            color="blue",
             marker="o",
+            s=1,
             zorder=base_zorder + 1,
         )
 
         # desulfovibro
         ax.scatter(
             *self.desulfo_locations[self.desulfo_mask, :].T,
-            color="orange",
+            color="green",
             marker="o",
+            s=1,
             zorder=base_zorder + 1,
         )
 
         # clostridia
         ax.scatter(
             *self.clost_locations[self.clost_mask, :].T,
-            color="lightblue",
-            marker="v",
+            color="red",
+            marker="o",
+            s=1,
             zorder=base_zorder + 1,
         )
 
         # bacteroides
         ax.scatter(
             *self.bacteroid_locations[self.bacteroid_mask, :].T,
-            color="pink",
-            marker=markers.MarkerStyle("s", fillstyle="none"),
+            color="grey",
+            marker="o",
+            s=1,
             zorder=base_zorder + 1,
         )
 
