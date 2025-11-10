@@ -305,12 +305,6 @@ class GutPython:
     def _glucose_factory(self):
         return np.full(self.geometry, 0.0, dtype=np.float64)
 
-    glucose_prev = field(type=np.ndarray)
-
-    @glucose_prev.default
-    def _glucose_prev_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
-
     glucose_reserve = field(type=np.ndarray)
 
     @glucose_reserve.default
@@ -323,12 +317,6 @@ class GutPython:
 
     @fo.default
     def _fo_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
-
-    fo_prev = field(type=np.ndarray)
-
-    @fo_prev.default
-    def _fo_prev_factory(self):
         return np.full(self.geometry, 0.0, dtype=np.float64)
 
     fo_reserve = field(type=np.ndarray)
@@ -345,12 +333,6 @@ class GutPython:
     def _lactose_factory(self):
         return np.full(self.geometry, 0.0, dtype=np.float64)
 
-    lactose_prev = field(type=np.ndarray)
-
-    @lactose_prev.default
-    def _lactose_prev_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
-
     lactose_reserve = field(type=np.ndarray)
 
     @lactose_reserve.default
@@ -363,12 +345,6 @@ class GutPython:
 
     @lactate.default
     def _lactate_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
-
-    lactate_prev = field(type=np.ndarray)
-
-    @lactate_prev.default
-    def _lactate_prev_factory(self):
         return np.full(self.geometry, 0.0, dtype=np.float64)
 
     lactate_reserve = field(type=np.ndarray)
@@ -385,12 +361,6 @@ class GutPython:
     def _inulin_factory(self):
         return np.full(self.geometry, 0.0, dtype=np.float64)
 
-    inulin_prev = field(type=np.ndarray)
-
-    @inulin_prev.default
-    def _inulin_prev_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
-
     inulin_reserve = field(type=np.ndarray)
 
     @inulin_reserve.default
@@ -403,12 +373,6 @@ class GutPython:
 
     @cs.default
     def _cs_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
-
-    cs_prev = field(type=np.ndarray)
-
-    @cs_prev.default
-    def _cs_prev_factory(self):
         return np.full(self.geometry, 0.0, dtype=np.float64)
 
     cs_reserve = field(type=np.ndarray)
@@ -1159,12 +1123,7 @@ class GutPython:
         self.lactate[:, :] = 0.0
         self.inulin[:, :] = 0.0
         self.cs[:, :] = 0.0
-        self.glucose_prev[:, :] = 0.0
-        self.fo_prev[:, :] = 0.0
-        self.lactose_prev[:, :] = 0.0
-        self.lactate_prev[:, :] = 0.0
-        self.inulin_prev[:, :] = 0.0
-        self.cs_prev[:, :] = 0.0
+
         self.glucose_reserve[:, :] = 0.0
         self.fo_reserve[:, :] = 0.0
         self.lactose_reserve[:, :] = 0.0
@@ -1214,7 +1173,8 @@ class GutPython:
         #   ]
 
         self.patch_eat()
-        self.store_metabolites()
+        # ACK: removed store_metabolites, since it only updated the _prev fields which were removed
+        # self.store_metabolites()
 
         #   ;; make meta must be in separate ask, sequential tasks
         #   ask patches[
@@ -1557,24 +1517,6 @@ class GutPython:
             case _:
                 assert False
 
-    def store_metabolites(self):
-        # to storeMetabolites
-        # ;; Sets previous metaohydrate variables to current levels to allow for correct
-        # ;; transfer on ticks
-        #   set inulinPrev ((inulin + inulinReserve))
-        #   set FOPrev ((FO + FOReserve))
-        #   set lactosePrev ((lactose + lactoseReserve))
-        #   set lactatePrev ((lactate + lactateReserve))
-        #   set glucosePrev ((glucose + glucoseReserve))
-        #   set CSPrev ((CS + CSReserve))
-        # end
-        self.inulin_prev[:, :] = self.inulin + self.inulin_reserve
-        self.fo_prev[:, :] = self.fo + self.fo_reserve
-        self.lactose_prev[:, :] = self.lactose + self.lactose_reserve
-        self.lactate_prev[:, :] = self.lactate + self.lactate_reserve
-        self.glucose_prev[:, :] = self.glucose + self.glucose_reserve
-        self.cs_prev[:, :] = self.cs + self.cs_reserve
-
     def make_metabolites(self):
         # to makeMetabolites
         # ;; Runs through all the metabolites and makes them, and moves them.
@@ -1629,13 +1571,13 @@ class GutPython:
         upper_flow_dist: int = lower_flow_dist + 1
         frac = self.flow_dist - lower_flow_dist
 
-        for metabolite, metabolite_prev, metabolite_reserve, metabolite_inflow in [
-            (self.inulin, self.inulin_prev, self.inulin_reserve, self.inulin_inflow),
-            (self.fo, self.fo_prev, self.fo_reserve, self.fo_inflow),
-            (self.lactose, self.lactose_prev, self.lactose_reserve, self.lactose_inflow),
-            (self.lactate, self.lactate_prev, self.lactate_reserve, self.lactate_inflow),
-            (self.glucose, self.glucose_prev, self.glucose_reserve, self.glucose_inflow),
-            (self.cs, self.cs_prev, self.cs_reserve, self.cs_inflow),
+        for metabolite, metabolite_reserve, metabolite_inflow in [
+            (self.inulin, self.inulin_reserve, self.inulin_inflow),
+            (self.fo, self.fo_reserve, self.fo_inflow),
+            (self.lactose, self.lactose_reserve, self.lactose_inflow),
+            (self.lactate, self.lactate_reserve, self.lactate_inflow),
+            (self.glucose, self.glucose_reserve, self.glucose_inflow),
+            (self.cs, self.cs_reserve, self.cs_inflow),
         ]:
             metabolite += metabolite_reserve
 
