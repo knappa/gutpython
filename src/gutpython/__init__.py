@@ -305,24 +305,12 @@ class GutPython:
     def _glucose_factory(self):
         return np.full(self.geometry, 0.0, dtype=np.float64)
 
-    glucose_reserve = field(type=np.ndarray)
-
-    @glucose_reserve.default
-    def _glucose_reserve_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
-
     ########################################
 
     fo = field(type=np.ndarray)
 
     @fo.default
     def _fo_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
-
-    fo_reserve = field(type=np.ndarray)
-
-    @fo_reserve.default
-    def _fo_reserve_factory(self):
         return np.full(self.geometry, 0.0, dtype=np.float64)
 
     ########################################
@@ -333,24 +321,12 @@ class GutPython:
     def _lactose_factory(self):
         return np.full(self.geometry, 0.0, dtype=np.float64)
 
-    lactose_reserve = field(type=np.ndarray)
-
-    @lactose_reserve.default
-    def _lactose_reserve_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
-
     ########################################
 
     lactate = field(type=np.ndarray)
 
     @lactate.default
     def _lactate_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
-
-    lactate_reserve = field(type=np.ndarray)
-
-    @lactate_reserve.default
-    def _lactate_reserve_factory(self):
         return np.full(self.geometry, 0.0, dtype=np.float64)
 
     ########################################
@@ -361,24 +337,12 @@ class GutPython:
     def _inulin_factory(self):
         return np.full(self.geometry, 0.0, dtype=np.float64)
 
-    inulin_reserve = field(type=np.ndarray)
-
-    @inulin_reserve.default
-    def _inulin_reserve_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
-
     ########################################
 
     cs = field(type=np.ndarray)
 
     @cs.default
     def _cs_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
-
-    cs_reserve = field(type=np.ndarray)
-
-    @cs_reserve.default
-    def _cs_reserve_factory(self):
         return np.full(self.geometry, 0.0, dtype=np.float64)
 
     ########################################
@@ -1124,12 +1088,6 @@ class GutPython:
         self.inulin[:, :] = 0.0
         self.cs[:, :] = 0.0
 
-        self.glucose_reserve[:, :] = 0.0
-        self.fo_reserve[:, :] = 0.0
-        self.lactose_reserve[:, :] = 0.0
-        self.lactate_reserve[:, :] = 0.0
-        self.inulin_reserve[:, :] = 0.0
-        self.cs_reserve[:, :] = 0.0
         self.stuck_chance[:, :] = 0.0
 
         #   ;; setup the true absorption rate
@@ -1518,69 +1476,23 @@ class GutPython:
                 assert False
 
     def make_metabolites(self):
-        # to makeMetabolites
-        # ;; Runs through all the metabolites and makes them, and moves them.
-        #   let frac (flowDist - (floor( flowDist )))
+        """
+        Handle flow and absorption of metabolites.
 
-        #   let leftDist (pxcor - min-pxcor)
-        #
-        #   if ((inulin < 0) or (CS < 0) or (FO < 0) or (lactose < 0) or (lactate < 0) or (glucose < 0)) [
-        #     print "ERROR! Patch reported negative metabolite. Problem with simulation leading to inaccurate results.
-        #     Terminating Program."
-        #     set negMeta true
-        #     stop
-        #   ]
-        #
-        #   set inulin ((inulin) + inulinReserve)
-        #   set FO ((FO) + FOReserve)
-        #   set lactose ((lactose) + lactoseReserve)
-        #   set lactate ((lactate) + lactateReserve)
-        #   set glucose ((glucose) + glucoseReserve)
-        #   set CS ((CS) + CSReserve)
-        #
-        #   let remainFactor 0
-        #   if (flowDist < 1)[set remainFactor (1 - flowDist)]
-        #   set inulin (inulin * remainFactor)
-        #   set FO (FO * remainFactor)
-        #   set lactose (lactose * remainFactor)
-        #   set lactate (lactate * remainFactor)
-        #   set glucose (glucose * remainFactor)
-        #   set CS (CS * remainFactor)
-        #
-        #   ;;The leftmost patches evenly split the inFlow number of metas
-        #   ifelse (leftDist < flowDist)[
-        #     let inFlowCoef (((min list 1 (flowDist - leftDist))) / (flowDist * span))
-        #     set inulin ((inulin) + (inFlowInulin * inFlowCoef))
-        #     set FO ((FO) + (inFlowFO * inFlowCoef))
-        #     set lactose ((lactose) + (inFlowLactose * inFlowCoef))
-        #     set lactate ((lactate) + (inFlowLactate * inFlowCoef))
-        #     set glucose ((glucose) + (inFlowGlucose * inFlowCoef))
-        #     set CS ((CS) + (inFlowCS * inFlowCoef))
-        #   ]
-        #   [
-        #     let added ( ((get-inulin (- (ceiling flowDist)) 0) * (min list frac (1 - remainFactor)))
-        #     + ((get-inulin (- (floor flowDist)) 0) * (min list (1 - frac) (floor flowDist))) )
-        #     ifelse (inulin + added) < 1000[
-        #       set inulin (inulin + (added))
-        #     ]
-        # 		[
-        # 			set inulin (1000)
-        # 		]
-
+        :return: None
+        """
         lower_flow_dist: int = math.floor(self.flow_dist)
         upper_flow_dist: int = lower_flow_dist + 1
         frac = self.flow_dist - lower_flow_dist
 
-        for metabolite, metabolite_reserve, metabolite_inflow in [
-            (self.inulin, self.inulin_reserve, self.inulin_inflow),
-            (self.fo, self.fo_reserve, self.fo_inflow),
-            (self.lactose, self.lactose_reserve, self.lactose_inflow),
-            (self.lactate, self.lactate_reserve, self.lactate_inflow),
-            (self.glucose, self.glucose_reserve, self.glucose_inflow),
-            (self.cs, self.cs_reserve, self.cs_inflow),
+        for metabolite, metabolite_inflow in [
+            (self.inulin, self.inulin_inflow),
+            (self.fo, self.fo_inflow),
+            (self.lactose, self.lactose_inflow),
+            (self.lactate, self.lactate_inflow),
+            (self.glucose, self.glucose_inflow),
+            (self.cs, self.cs_inflow),
         ]:
-            metabolite += metabolite_reserve
-
             # amount per patch. (i.e. evenly distributed vertically, per unit length in horizontal direction)
             metabolite_inflow_amt_per_patch = metabolite_inflow / (
                 self.geometry[1] * self.flow_dist
@@ -1609,50 +1521,15 @@ class GutPython:
             np.clip(metabolite, 0, 1000, out=metabolite)
             metabolite[metabolite < 0.001] = 0
 
-        # ;;Need to handle case of patch which flowDist ends in from beginning
-        # ACK: I think that I already have? TODO: check
-
-        # 	ifelse (((max-pxcor - min-pxcor) < 1))[
-        # 		set inulinReserve (0)
-        #   	set FOReserve (0)
-        #   	set lactoseReserve (0)
-        #   	set lactateReserve (0)
-        #   	set glucoseReserve (0)
-        #   	set CSReserve (0)
-        # 	][
-        #   	set inulinReserve ((inulin) * reserveFraction * ((max-pxcor - pxcor)/(max-pxcor - min-pxcor)))
-        #   	set FOReserve ((FO) * reserveFraction * ((max-pxcor - pxcor)/(max-pxcor - min-pxcor)))
-        #   	set lactoseReserve ((lactose) * reserveFraction * ((max-pxcor - pxcor)/(max-pxcor - min-pxcor)))
-        #   	set lactateReserve ((lactate) * reserveFraction * ((max-pxcor - pxcor)/(max-pxcor - min-pxcor)))
-        #   	set glucoseReserve ((glucose) * reserveFraction * ((max-pxcor - pxcor)/(max-pxcor - min-pxcor)))
-        #   	set CSReserve ((CS) * reserveFraction * ((max-pxcor - pxcor)/(max-pxcor - min-pxcor)))
-        # 	]
-        #
-        #   	set inulin ((inulin - inulinReserve) * (1 - trueAbsorption))
-        #   	set FO ((FO - FOReserve) * (1 - trueAbsorption))
-        #   	set lactose ((lactose - lactoseReserve) * (1 - trueAbsorption))
-        #   	set lactate ((lactate - lactateReserve) * (1 - trueAbsorption))
-        #   	set glucose ((glucose - glucoseReserve) * (1 - trueAbsorption))
-        #   	set CS ((CS - CSReserve) * (1 - trueAbsorption))
-
-        for metabolite, metabolite_reserve in [
-            (self.inulin, self.inulin_reserve),
-            (self.fo, self.fo_reserve),
-            (self.lactose, self.lactose_reserve),
-            (self.lactate, self.lactate_reserve),
-            (self.glucose, self.glucose_reserve),
-            (self.cs, self.cs_reserve),
-        ]:
             if self.GRID_WIDTH == 1:
-                metabolite_reserve[:, :] = 0.0
+                metabolite[:, :] *= 1 - self.true_absorption * (1 - self.reserve_fraction)
             else:
-                metabolite_reserve[:, :] = (
-                    metabolite
-                    * self.reserve_fraction
+                metabolite[:, :] *= 1 - self.true_absorption * (
+                    1
+                    - self.reserve_fraction
                     * np.arange(self.GRID_WIDTH)[::-1, np.newaxis]
                     / (self.GRID_WIDTH - 1)
                 )
-            metabolite[:, :] = (metabolite - metabolite_reserve) * (1 - self.true_absorption)
 
     def bact_tick_behavior(self):
         # to bactTickBehavior
