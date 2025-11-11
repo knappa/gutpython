@@ -11,7 +11,7 @@ BIG_NUM = 3000
 MEDIUM_NUM = 200
 
 
-@define(kw_only=True)
+@define(kw_only=True, frozen=False)
 class GutPython:
     GRID_WIDTH: int = field(default=100)
     GRID_HEIGHT: int = field(default=1)
@@ -91,6 +91,49 @@ class GutPython:
     @property
     def num_bacteria(self):
         return self.num_closts + self.num_bifidos + self.num_bacteroids + self.num_bacteroids
+
+    ######################################################################
+    # measurements
+
+    sim_terminated: bool = field(default=False, init=False)
+
+    excreted_bacteroids: int = field(default=0, init=False)
+    excreted_bifidos: int = field(default=0, init=False)
+    excreted_closts: int = field(default=0, init=False)
+    excreted_desulfos: int = field(default=0, init=False)
+    # TODO: these are all live cells, keep track of excreted dead cells?
+
+    excreted_inulin: float = field(default=0.0, init=False)
+    excreted_fo: float = field(default=0.0, init=False)
+    excreted_lactose: float = field(default=0.0, init=False)
+    excreted_lactate: float = field(default=0.0, init=False)
+    excreted_glucose: float = field(default=0.0, init=False)
+    excreted_cs: float = field(default=0.0, init=False)
+
+    absorbed_inulin: float = field(default=0.0, init=False)
+    absorbed_fo: float = field(default=0.0, init=False)
+    absorbed_lactose: float = field(default=0.0, init=False)
+    absorbed_lactate: float = field(default=0.0, init=False)
+    absorbed_glucose: float = field(default=0.0, init=False)
+    absorbed_cs: float = field(default=0.0, init=False)
+
+    @property
+    def mean_bacteroid_energy(self):
+        return (
+            np.mean(self.bacteroid_energy[self.bacteroid_mask]) if self.num_bacteroids > 0 else 0.0
+        )
+
+    @property
+    def mean_bifido_energy(self):
+        return np.mean(self.bifido_energy[self.bifido_mask]) if self.num_bifidos > 0 else 0.0
+
+    @property
+    def mean_clost_energy(self):
+        return np.mean(self.clost_energy[self.clost_mask]) if self.num_closts > 0 else 0.0
+
+    @property
+    def mean_desulfo_energy(self):
+        return np.mean(self.desulfo_energy[self.desulfo_mask]) if self.num_desulfos > 0 else 0.0
 
     ######################################################################
     # bifidobacteria
@@ -1122,7 +1165,10 @@ class GutPython:
         #   ;; stop if error or unexpected output
         #   stopCheck
 
-        self.stop_check()
+        # ACK: removed
+        # self.stop_check()
+        if self.num_bacteria > 1000000 or self.num_bacteria <= 0:
+            self.sim_terminated = True
 
         #   ;; Modify the energy level of each turtle and metabolite level of each patch
         #   ask patches [
@@ -1172,25 +1218,6 @@ class GutPython:
         self.ticks += 1
 
         # end
-
-    def stop_check(self):
-        # to stopCheck
-        # ;; code for stopping the simulation on unexpected output
-        #
-        #   ;; Stop if negative number of metas calculated
-        #   if negMeta [stop]
-        #
-        #   ;; Stop if any population hits 0 or there are too many turtles
-        #   if (count turtles > 1000000) [ stop ]
-        #   if not any? turtles [ stop ] ;; stop if all turtles are dead
-        # end
-        # if self.neg_meta:
-        #     exit()
-        if self.num_bacteria > 1000000:
-            exit()
-        if self.num_bacteria <= 0:
-            exit()
-        # TODO: implement better signalling than an immediate exit.
 
     def patch_eat(self):
         # to patchEat
@@ -1485,13 +1512,13 @@ class GutPython:
         upper_flow_dist: int = lower_flow_dist + 1
         frac = self.flow_dist - lower_flow_dist
 
-        for metabolite, metabolite_inflow in [
-            (self.inulin, self.inulin_inflow),
-            (self.fo, self.fo_inflow),
-            (self.lactose, self.lactose_inflow),
-            (self.lactate, self.lactate_inflow),
-            (self.glucose, self.glucose_inflow),
-            (self.cs, self.cs_inflow),
+        for metabolite_name, metabolite, metabolite_inflow in [
+            ("inulin", self.inulin, self.inulin_inflow),
+            ("fo", self.fo, self.fo_inflow),
+            ("lactose", self.lactose, self.lactose_inflow),
+            ("lactate", self.lactate, self.lactate_inflow),
+            ("glucose", self.glucose, self.glucose_inflow),
+            ("cs", self.cs, self.cs_inflow),
         ]:
             # amount per patch. (i.e. evenly distributed vertically, per unit length in horizontal direction)
             metabolite_inflow_amt_per_patch = metabolite_inflow / (
@@ -1500,11 +1527,25 @@ class GutPython:
 
             if frac > 0.0:
                 if lower_flow_dist == 0:
+                    setattr(
+                        self, f"excreted_{metabolite_name}", float(frac * np.sum(metabolite[-1, :]))
+                    )
                     metabolite[1:, :] = frac * metabolite[:-1, :] + (1 - frac) * metabolite[1:, :]
                     metabolite[0, :] = (
                         metabolite[0, :] * (1 - frac) + metabolite_inflow_amt_per_patch * frac
                     )
                 else:
+                    setattr(
+                        self,
+                        f"excreted_{metabolite_name}",
+                        float(
+                            frac
+                            * (
+                                np.sum(metabolite[-upper_flow_dist, :])
+                                + np.sum(metabolite[-upper_flow_dist:, :])
+                            )
+                        ),
+                    )
                     metabolite[upper_flow_dist:, :] = (
                         frac * metabolite[:-upper_flow_dist, :]
                         + (1 - frac) * metabolite[1:-lower_flow_dist, :]
@@ -1513,6 +1554,11 @@ class GutPython:
                         metabolite[0, :] * (1 - frac) + metabolite_inflow_amt_per_patch * frac
                     )
             else:
+                setattr(
+                    self,
+                    f"excreted_{metabolite_name}",
+                    float(frac * (np.sum(metabolite[-lower_flow_dist:, :]))),
+                )
                 metabolite[lower_flow_dist:, :] = metabolite[:-lower_flow_dist, :]
 
             if lower_flow_dist > 0:
@@ -1522,14 +1568,30 @@ class GutPython:
             metabolite[metabolite < 0.001] = 0
 
             if self.GRID_WIDTH == 1:
-                metabolite[:, :] *= 1 - self.true_absorption * (1 - self.reserve_fraction)
-            else:
-                metabolite[:, :] *= 1 - self.true_absorption * (
-                    1
-                    - self.reserve_fraction
-                    * np.arange(self.GRID_WIDTH)[::-1, np.newaxis]
-                    / (self.GRID_WIDTH - 1)
+                absorption = self.true_absorption * (1 - self.reserve_fraction) * metabolite
+                setattr(
+                    self,
+                    f"absorbed_{metabolite_name}",
+                    float(np.sum(absorption[:, :])),
                 )
+                metabolite[:, :] -= absorption
+            else:
+                absorption = (
+                    self.true_absorption
+                    * (
+                        1
+                        - self.reserve_fraction
+                        * np.arange(self.GRID_WIDTH)[::-1, np.newaxis]
+                        / (self.GRID_WIDTH - 1)
+                    )
+                    * metabolite
+                )
+                setattr(
+                    self,
+                    f"absorbed_{metabolite_name}",
+                    float(np.sum(absorption[:, :])),
+                )
+                metabolite[:, :] -= absorption
 
     def bact_tick_behavior(self):
         # to bactTickBehavior
@@ -1551,8 +1613,9 @@ class GutPython:
 
         # excrete
         bifido_excrete = (self.bifido_locations[:, 0] >= self.GRID_WIDTH) & self.bifido_mask
+        self.excreted_bifidos = np.sum(bifido_excrete)
         self.bifido_mask[bifido_excrete] = False
-        self.num_bifidos -= np.sum(bifido_excrete)
+        self.num_bifidos -= self.excreted_bifidos
 
         # deathBifidos
         to_kill = self.bifido_mask & (self.bifido_energy <= 0)
@@ -1625,8 +1688,9 @@ class GutPython:
 
         # excrete
         desulfo_excrete = (self.desulfo_locations[:, 0] >= self.GRID_WIDTH) & self.desulfo_mask
+        self.excreted_desulfos = np.sum(desulfo_excrete)
         self.desulfo_mask[desulfo_excrete] = False
-        self.num_desulfos -= np.sum(desulfo_excrete)
+        self.num_desulfos -= self.excreted_desulfos
 
         # deathDesulfos
         to_kill = self.desulfo_mask & (self.desulfo_energy <= 0)
@@ -1694,8 +1758,9 @@ class GutPython:
 
         # excrete
         clost_excrete = (self.clost_locations[:, 0] >= self.GRID_WIDTH) & self.clost_mask
+        self.excreted_closts = np.sum(clost_excrete)
         self.clost_mask[clost_excrete] = False
-        self.num_closts -= np.sum(clost_excrete)
+        self.num_closts -= self.excreted_closts
 
         # deathClosts
         to_kill = self.clost_mask & (self.clost_energy <= 0)
@@ -1768,8 +1833,9 @@ class GutPython:
         bacteroid_excrete = (
             self.bacteroid_locations[:, 0] >= self.GRID_WIDTH
         ) & self.bacteroid_mask
+        self.excreted_bacteroids = np.sum(bacteroid_excrete)
         self.bacteroid_mask[bacteroid_excrete] = False
-        self.num_bacteroids -= np.sum(bacteroid_excrete)
+        self.num_bacteroids -= self.excreted_bacteroids
 
         # deathBacteroids
         to_kill = self.bacteroid_mask & (self.bacteroid_energy <= 0)
