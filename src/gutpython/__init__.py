@@ -7,62 +7,83 @@ import matplotlib.pyplot as plt
 import numpy as np
 from attr import define, field, fields
 
-BIG_NUM = 3000
-MEDIUM_NUM = 200
+DEFAULT_SIZE = 200
 
 
 @define(kw_only=True, frozen=False)
 class GutPython:
-    GRID_WIDTH: int = field(default=100)
-    GRID_HEIGHT: int = field(default=1)
-    MAX_BIFIDOS: int = field(default=BIG_NUM)
-    MAX_DESULFOS: int = field(default=MEDIUM_NUM)
-    MAX_CLOSTS: int = field(default=MEDIUM_NUM)
-    MAX_BACTEROIDS: int = field(default=MEDIUM_NUM)
-
-    # globals
-    #   [ trueAbsorption negMeta testState result
-    #   ]
+    GRID_WIDTH: int = field(default=100, metadata={"type": "parameter"})
+    GRID_HEIGHT: int = field(default=1, metadata={"type": "parameter"})
+    MAX_BIFIDOS: int = field(default=DEFAULT_SIZE, metadata={"type": "bookkeeping"})
+    MAX_DESULFOS: int = field(default=DEFAULT_SIZE, metadata={"type": "bookkeeping"})
+    MAX_CLOSTS: int = field(default=DEFAULT_SIZE, metadata={"type": "bookkeeping"})
+    MAX_BACTEROIDS: int = field(default=DEFAULT_SIZE, metadata={"type": "bookkeeping"})
 
     ######################################################################
     # parameters from interface
 
-    max_stuck_chance: float = field(default=50)  # TODO: understand units. percent?
-    low_stuck_bound: float = field(default=2)  # TODO: understand units. percent?
-    unstuck_chance: float = field(default=10)  # TODO: understand units. percent?
-    mid_stuck_conc: float = field(default=10.0)  # TODO: understand units. percent?
-    seed_chance: float = field(default=5.0)  # TODO: understand units. percent?
-    seed_percent: float = field(default=5.0)
+    max_stuck_chance: float = field(
+        default=50, metadata={"type": "parameter"}
+    )  # TODO: understand units. percent?
+    low_stuck_bound: float = field(
+        default=2, metadata={"type": "parameter"}
+    )  # TODO: understand units. percent?
+    unstuck_chance: float = field(
+        default=10, metadata={"type": "parameter"}
+    )  # TODO: understand units. percent?
+    mid_stuck_conc: float = field(
+        default=10.0, metadata={"type": "parameter"}
+    )  # TODO: understand units. percent?
+    seed_chance: float = field(
+        default=5.0, metadata={"type": "parameter"}
+    )  # TODO: understand units. percent?
+    seed_percent: float = field(default=5.0, metadata={"type": "parameter"})
 
-    absorption: float = field(default=0.0)  # TODO: understand units.
-    reserve_fraction: float = field(default=0.0)  # TODO: understand units.
+    absorption: float = field(
+        default=0.0, metadata={"type": "parameter"}
+    )  # TODO: understand units.
+    reserve_fraction: float = field(
+        default=0.0, metadata={"type": "parameter"}
+    )  # TODO: understand units.
 
-    init_num_bifidos: int = field(default=23562)  # TODO: uhh? Seems awfully specific.
-    init_num_bacteroids: int = field(default=5490)  # TODO: uhh? Seems awfully specific.
-    init_num_closts: int = field(default=921)  # TODO: uhh? Seems awfully specific.
-    init_num_desulfos: int = field(default=70)
+    init_num_bifidos: int = field(
+        default=23562, metadata={"type": "parameter"}
+    )  # TODO: uhh? Seems awfully specific.
+    init_num_bacteroids: int = field(
+        default=5490, metadata={"type": "parameter"}
+    )  # TODO: uhh? Seems awfully specific.
+    init_num_closts: int = field(
+        default=921, metadata={"type": "parameter"}
+    )  # TODO: uhh? Seems awfully specific.
+    init_num_desulfos: int = field(default=70, metadata={"type": "parameter"})
 
-    bifido_lactate_production: float = field(default=0.005)
+    bifido_lactate_production: float = field(default=0.005, metadata={"type": "parameter"})
 
-    flow_dist: float = field(default=0.28)
+    flow_dist: float = field(default=0.28, metadata={"type": "parameter"})
 
-    inulin_inflow: float = field(default=10.0)
-    fo_inflow: float = field(default=25.0)
-    lactose_inflow: float = field(default=15.0)
-    lactate_inflow: float = field(default=0.0)
-    glucose_inflow: float = field(default=30.0)
-    cs_inflow: float = field(default=0.1)
+    inulin_inflow: float = field(default=10.0, metadata={"type": "parameter"})
+    fo_inflow: float = field(default=25.0, metadata={"type": "parameter"})
+    lactose_inflow: float = field(default=15.0, metadata={"type": "parameter"})
+    lactate_inflow: float = field(default=0.0, metadata={"type": "parameter"})
+    glucose_inflow: float = field(default=30.0, metadata={"type": "parameter"})
+    cs_inflow: float = field(default=0.1, metadata={"type": "parameter"})
 
-    bifido_doub: int = field(default=330)
-    desulfo_doub: int = field(default=330)
-    bacteroid_doub: int = field(default=330)
-    clost_doub: int = field(default=330)
+    bifido_doub: int = field(default=330, metadata={"type": "parameter"})
+    desulfo_doub: int = field(default=330, metadata={"type": "parameter"})
+    bacteroid_doub: int = field(default=330, metadata={"type": "parameter"})
+    clost_doub: int = field(default=330, metadata={"type": "parameter"})
 
-    tick_in_flow: int = field(default=480)
-    in_conc_bacteroids: int = field(default=0)
-    in_conc_bifidos: int = field(default=0)
-    in_conc_closts: int = field(default=0)
-    in_conc_desulfos: int = field(default=0)
+    bifido_flow_const: float = field(default=1.0, metadata={"type": "parameter"})
+    desulfo_flow_const: float = field(default=1.0, metadata={"type": "parameter"})
+    clost_flow_const: float = field(default=1.0, metadata={"type": "parameter"})
+    bacteroid_flow_const: float = field(default=1.0, metadata={"type": "parameter"})
+
+    in_conc_bacteroids: int = field(default=0, metadata={"type": "parameter"})
+    in_conc_bifidos: int = field(default=0, metadata={"type": "parameter"})
+    in_conc_closts: int = field(default=0, metadata={"type": "parameter"})
+    in_conc_desulfos: int = field(default=0, metadata={"type": "parameter"})
+
+    tick_in_flow: int = field(default=480, metadata={"type": "parameter"})
 
     ######################################################################
     # hidden parameters (magic constants)
@@ -72,11 +93,11 @@ class GutPython:
     ######################################################################
     # other globals
 
-    true_absorption: float = field(default=0.0)  # TODO: understand units.
+    true_absorption: float = field(
+        default=0.0, metadata={"type": "parameter"}
+    )  # TODO: understand units.
 
-    # neg_meta: bool = False
-    test_state: int = field(default=0)
-    ticks: int = field(default=0)
+    ticks: int = field(default=0, metadata={"type": "parameter"})
 
     ######################################################################
     # static properties
@@ -95,27 +116,27 @@ class GutPython:
     ######################################################################
     # measurements
 
-    sim_terminated: bool = field(default=False, init=False)
+    sim_terminated: bool = field(default=False, init=False, metadata={"type": "bookkeeping"})
 
-    excreted_bacteroids: int = field(default=0, init=False)
-    excreted_bifidos: int = field(default=0, init=False)
-    excreted_closts: int = field(default=0, init=False)
-    excreted_desulfos: int = field(default=0, init=False)
+    excreted_bacteroids: int = field(default=0, init=False, metadata={"type": "measurement"})
+    excreted_bifidos: int = field(default=0, init=False, metadata={"type": "measurement"})
+    excreted_closts: int = field(default=0, init=False, metadata={"type": "measurement"})
+    excreted_desulfos: int = field(default=0, init=False, metadata={"type": "measurement"})
     # TODO: these are all live cells, keep track of excreted dead cells?
 
-    excreted_inulin: float = field(default=0.0, init=False)
-    excreted_fo: float = field(default=0.0, init=False)
-    excreted_lactose: float = field(default=0.0, init=False)
-    excreted_lactate: float = field(default=0.0, init=False)
-    excreted_glucose: float = field(default=0.0, init=False)
-    excreted_cs: float = field(default=0.0, init=False)
+    excreted_inulin: float = field(default=0.0, init=False, metadata={"type": "measurement"})
+    excreted_fo: float = field(default=0.0, init=False, metadata={"type": "measurement"})
+    excreted_lactose: float = field(default=0.0, init=False, metadata={"type": "measurement"})
+    excreted_lactate: float = field(default=0.0, init=False, metadata={"type": "measurement"})
+    excreted_glucose: float = field(default=0.0, init=False, metadata={"type": "measurement"})
+    excreted_cs: float = field(default=0.0, init=False, metadata={"type": "measurement"})
 
-    absorbed_inulin: float = field(default=0.0, init=False)
-    absorbed_fo: float = field(default=0.0, init=False)
-    absorbed_lactose: float = field(default=0.0, init=False)
-    absorbed_lactate: float = field(default=0.0, init=False)
-    absorbed_glucose: float = field(default=0.0, init=False)
-    absorbed_cs: float = field(default=0.0, init=False)
+    absorbed_inulin: float = field(default=0.0, init=False, metadata={"type": "measurement"})
+    absorbed_fo: float = field(default=0.0, init=False, metadata={"type": "measurement"})
+    absorbed_lactose: float = field(default=0.0, init=False, metadata={"type": "measurement"})
+    absorbed_lactate: float = field(default=0.0, init=False, metadata={"type": "measurement"})
+    absorbed_glucose: float = field(default=0.0, init=False, metadata={"type": "measurement"})
+    absorbed_cs: float = field(default=0.0, init=False, metadata={"type": "measurement"})
 
     @property
     def mean_bacteroid_energy(self):
@@ -138,49 +159,46 @@ class GutPython:
     ######################################################################
     # bifidobacteria
 
-    bifido_doub_const: float = field(default=1.0)
-    bifido_flow_const: float = field(default=1.0)
+    num_bifidos: int = field(init=False, factory=lambda: 0, metadata={"type": "bookkeeping"})
+    bifido_pointer: int = field(init=False, factory=lambda: 0, metadata={"type": "bookkeeping"})
 
-    num_bifidos: int = field(init=False, factory=lambda: 0)
-    bifido_pointer: int = field(init=False, factory=lambda: 0)
-
-    bifido_mask = field(type=np.ndarray)
+    bifido_mask = field(type=np.ndarray, metadata={"type": "bookkeeping"})
 
     @bifido_mask.default
     def _bifido_mask_factory(self):
         return np.zeros(self.MAX_BIFIDOS, dtype=bool)
 
-    bifido_locations = field(type=np.ndarray)
+    bifido_locations = field(type=np.ndarray, metadata={"type": "agent"})
 
     @bifido_locations.default
     def _bifido_locations_factory(self):
         return np.zeros((self.MAX_BIFIDOS, 2), dtype=np.float64)
 
-    bifido_age = field(type=np.ndarray)
+    bifido_age = field(type=np.ndarray, metadata={"type": "agent"})
 
     @bifido_age.default
     def _bifido_age_factory(self):
         return np.zeros(self.MAX_BIFIDOS, dtype=np.int64)
 
-    bifido_is_seed = field(type=np.ndarray)
+    bifido_is_seed = field(type=np.ndarray, metadata={"type": "agent"})
 
     @bifido_is_seed.default
     def _bifido_is_seed_factory(self):
         return np.zeros(self.MAX_BIFIDOS, dtype=np.bool_)
 
-    bifido_is_stuck = field(type=np.ndarray)
+    bifido_is_stuck = field(type=np.ndarray, metadata={"type": "agent"})
 
     @bifido_is_stuck.default
     def _bifido_is_stuck_factory(self):
         return np.zeros(self.MAX_BIFIDOS, dtype=np.bool_)
 
-    bifido_remaining_attempts = field(type=np.ndarray)
+    bifido_remaining_attempts = field(type=np.ndarray, metadata={"type": "agent"})
 
     @bifido_remaining_attempts.default
     def _bifido_remaining_attempts_factory(self):
         return np.zeros(self.MAX_BIFIDOS, dtype=np.int64)
 
-    bifido_energy = field(type=np.ndarray)
+    bifido_energy = field(type=np.ndarray, metadata={"type": "agent"})
 
     @bifido_energy.default
     def _bifido_energy_factory(self):
@@ -189,49 +207,46 @@ class GutPython:
     ######################################################################
     # desulfovibro
 
-    desulfo_doub_const: float = field(default=1.0)
-    desulfo_flow_const: float = field(default=1.0)
+    num_desulfos: int = field(init=False, factory=lambda: 0, metadata={"type": "bookkeeping"})
+    desulfo_pointer: int = field(init=False, factory=lambda: 0, metadata={"type": "bookkeeping"})
 
-    num_desulfos: int = field(init=False, factory=lambda: 0)
-    desulfo_pointer: int = field(init=False, factory=lambda: 0)
-
-    desulfo_mask = field(type=np.ndarray)
+    desulfo_mask = field(type=np.ndarray, metadata={"type": "bookkeeping"})
 
     @desulfo_mask.default
     def _desulfo_mask_factory(self):
         return np.zeros(self.MAX_DESULFOS, dtype=bool)
 
-    desulfo_locations = field(type=np.ndarray)
+    desulfo_locations = field(type=np.ndarray, metadata={"type": "agent"})
 
     @desulfo_locations.default
     def _desulfo_locations_factory(self):
         return np.zeros((self.MAX_DESULFOS, 2), dtype=np.float64)
 
-    desulfo_age = field(type=np.ndarray)
+    desulfo_age = field(type=np.ndarray, metadata={"type": "agent"})
 
     @desulfo_age.default
     def _desulfo_age_factory(self):
         return np.zeros(self.MAX_DESULFOS, dtype=np.int64)
 
-    desulfo_is_seed = field(type=np.ndarray)
+    desulfo_is_seed = field(type=np.ndarray, metadata={"type": "agent"})
 
     @desulfo_is_seed.default
     def _desulfo_is_seed_factory(self):
         return np.zeros(self.MAX_DESULFOS, dtype=np.bool_)
 
-    desulfo_is_stuck = field(type=np.ndarray)
+    desulfo_is_stuck = field(type=np.ndarray, metadata={"type": "agent"})
 
     @desulfo_is_stuck.default
     def _desulfo_is_stuck_factory(self):
         return np.zeros(self.MAX_DESULFOS, dtype=np.bool_)
 
-    desulfo_remaining_attempts = field(type=np.ndarray)
+    desulfo_remaining_attempts = field(type=np.ndarray, metadata={"type": "agent"})
 
     @desulfo_remaining_attempts.default
     def _desulfo_remaining_attempts_factory(self):
         return np.zeros(self.MAX_DESULFOS, dtype=np.int64)
 
-    desulfo_energy = field(type=np.ndarray)
+    desulfo_energy = field(type=np.ndarray, metadata={"type": "agent"})
 
     @desulfo_energy.default
     def _desulfo_energy_factory(self):
@@ -240,49 +255,46 @@ class GutPython:
     ######################################################################
     # clostridia
 
-    clost_doub_const: float = field(default=1.0)
-    clost_flow_const: float = field(default=1.0)
+    num_closts: int = field(init=False, factory=lambda: 0, metadata={"type": "bookkeeping"})
+    clost_pointer: int = field(init=False, factory=lambda: 0, metadata={"type": "bookkeeping"})
 
-    num_closts: int = field(init=False, factory=lambda: 0)
-    clost_pointer: int = field(init=False, factory=lambda: 0)
-
-    clost_mask = field(type=np.ndarray)
+    clost_mask = field(type=np.ndarray, metadata={"type": "bookkeeping"})
 
     @clost_mask.default
     def _clost_mask_factory(self):
         return np.zeros(self.MAX_CLOSTS, dtype=bool)
 
-    clost_locations = field(type=np.ndarray)
+    clost_locations = field(type=np.ndarray, metadata={"type": "agent"})
 
     @clost_locations.default
     def _clost_locations_factory(self):
         return np.zeros((self.MAX_CLOSTS, 2), dtype=np.float64)
 
-    clost_age = field(type=np.ndarray)
+    clost_age = field(type=np.ndarray, metadata={"type": "agent"})
 
     @clost_age.default
     def _clost_age_factory(self):
         return np.zeros(self.MAX_CLOSTS, dtype=np.int64)
 
-    clost_is_seed = field(type=np.ndarray)
+    clost_is_seed = field(type=np.ndarray, metadata={"type": "agent"})
 
     @clost_is_seed.default
     def _clost_is_seed_factory(self):
         return np.zeros(self.MAX_CLOSTS, dtype=np.bool_)
 
-    clost_is_stuck = field(type=np.ndarray)
+    clost_is_stuck = field(type=np.ndarray, metadata={"type": "agent"})
 
     @clost_is_stuck.default
     def _clost_is_stuck_factory(self):
         return np.zeros(self.MAX_CLOSTS, dtype=np.bool_)
 
-    clost_remaining_attempts = field(type=np.ndarray)
+    clost_remaining_attempts = field(type=np.ndarray, metadata={"type": "agent"})
 
     @clost_remaining_attempts.default
     def _clost_remaining_attempts_factory(self):
         return np.zeros(self.MAX_CLOSTS, dtype=np.int64)
 
-    clost_energy = field(type=np.ndarray)
+    clost_energy = field(type=np.ndarray, metadata={"type": "agent"})
 
     @clost_energy.default
     def _clost_energy_factory(self):
@@ -291,49 +303,46 @@ class GutPython:
     ######################################################################
     # bacteroides
 
-    bacteroid_doub_const: float = field(default=1.0)
-    bacteroid_flow_const: float = field(default=1.0)
+    num_bacteroids: int = field(init=False, factory=lambda: 0, metadata={"type": "bookkeeping"})
+    bacteroid_pointer: int = field(init=False, factory=lambda: 0, metadata={"type": "bookkeeping"})
 
-    num_bacteroids: int = field(init=False, factory=lambda: 0)
-    bacteroid_pointer: int = field(init=False, factory=lambda: 0)
-
-    bacteroid_mask = field(type=np.ndarray)
+    bacteroid_mask = field(type=np.ndarray, metadata={"type": "bookkeeping"})
 
     @bacteroid_mask.default
     def _bacteroid_mask_factory(self):
         return np.zeros(self.MAX_BACTEROIDS, dtype=bool)
 
-    bacteroid_locations = field(type=np.ndarray)
+    bacteroid_locations = field(type=np.ndarray, metadata={"type": "agent"})
 
     @bacteroid_locations.default
     def _bacteroid_locations_factory(self):
         return np.zeros((self.MAX_BACTEROIDS, 2), dtype=np.float64)
 
-    bacteroid_age = field(type=np.ndarray)
+    bacteroid_age = field(type=np.ndarray, metadata={"type": "agent"})
 
     @bacteroid_age.default
     def _bacteroid_age_factory(self):
         return np.zeros(self.MAX_BACTEROIDS, dtype=np.int64)
 
-    bacteroid_is_seed = field(type=np.ndarray)
+    bacteroid_is_seed = field(type=np.ndarray, metadata={"type": "agent"})
 
     @bacteroid_is_seed.default
     def _bacteroid_is_seed_factory(self):
         return np.zeros(self.MAX_BACTEROIDS, dtype=np.bool_)
 
-    bacteroid_is_stuck = field(type=np.ndarray)
+    bacteroid_is_stuck = field(type=np.ndarray, metadata={"type": "agent"})
 
     @bacteroid_is_stuck.default
     def _bacteroid_is_stuck_factory(self):
         return np.zeros(self.MAX_BACTEROIDS, dtype=np.bool_)
 
-    bacteroid_remaining_attempts = field(type=np.ndarray)
+    bacteroid_remaining_attempts = field(type=np.ndarray, metadata={"type": "agent"})
 
     @bacteroid_remaining_attempts.default
     def _bacteroid_remaining_attempts_factory(self):
         return np.zeros(self.MAX_BACTEROIDS, dtype=np.int64)
 
-    bacteroid_energy = field(type=np.ndarray)
+    bacteroid_energy = field(type=np.ndarray, metadata={"type": "agent"})
 
     @bacteroid_energy.default
     def _bacteroid_energy_factory(self):
@@ -342,7 +351,7 @@ class GutPython:
     ######################################################################
     # patches
 
-    glucose = field(type=np.ndarray)
+    glucose = field(type=np.ndarray, metadata={"type": "molecule"})
 
     @glucose.default
     def _glucose_factory(self):
@@ -350,7 +359,7 @@ class GutPython:
 
     ########################################
 
-    fo = field(type=np.ndarray)
+    fo = field(type=np.ndarray, metadata={"type": "molecule"})
 
     @fo.default
     def _fo_factory(self):
@@ -358,7 +367,7 @@ class GutPython:
 
     ########################################
 
-    lactose = field(type=np.ndarray)
+    lactose = field(type=np.ndarray, metadata={"type": "molecule"})
 
     @lactose.default
     def _lactose_factory(self):
@@ -366,7 +375,7 @@ class GutPython:
 
     ########################################
 
-    lactate = field(type=np.ndarray)
+    lactate = field(type=np.ndarray, metadata={"type": "molecule"})
 
     @lactate.default
     def _lactate_factory(self):
@@ -374,7 +383,7 @@ class GutPython:
 
     ########################################
 
-    inulin = field(type=np.ndarray)
+    inulin = field(type=np.ndarray, metadata={"type": "molecule"})
 
     @inulin.default
     def _inulin_factory(self):
@@ -382,7 +391,7 @@ class GutPython:
 
     ########################################
 
-    cs = field(type=np.ndarray)
+    cs = field(type=np.ndarray, metadata={"type": "molecule"})
 
     @cs.default
     def _cs_factory(self):
@@ -390,7 +399,7 @@ class GutPython:
 
     ########################################
 
-    stuck_chance = field(type=np.ndarray)
+    stuck_chance = field(type=np.ndarray, metadata={"type": "molecule"})
 
     @stuck_chance.default
     def _stuck_chance_factory(self):
@@ -460,49 +469,54 @@ class GutPython:
         self.bifido_mask[self.num_bifidos :] = False
         self.bifido_pointer = self.num_bifidos
 
-    def _expand_bifido_arrays(self):
+    def _expand_bifido_arrays(self, new_max_bifidos: Optional[int] = None) -> None:
         old_max_bifidos = self.MAX_BIFIDOS
-        self.MAX_BIFIDOS *= 2
+        if new_max_bifidos is None:
+            self.MAX_BIFIDOS *= 2
+        else:
+            if new_max_bifidos <= self.MAX_BIFIDOS:
+                return
+            self.MAX_BIFIDOS = new_max_bifidos
 
         self.bifido_locations = np.pad(
             self.bifido_locations,
-            pad_width=np.array(((0, old_max_bifidos), (0, 0))),
+            pad_width=np.array(((0, self.MAX_BIFIDOS - old_max_bifidos), (0, 0))),
             mode="constant",
             constant_values=(0, 0),
         )
         self.bifido_age = np.pad(
             self.bifido_age,
-            pad_width=np.array((0, old_max_bifidos)),
+            pad_width=np.array((0, self.MAX_BIFIDOS - old_max_bifidos)),
             mode="constant",
             constant_values=0,
         )
         self.bifido_energy = np.pad(
             self.bifido_energy,
-            pad_width=np.array((0, old_max_bifidos)),
+            pad_width=np.array((0, self.MAX_BIFIDOS - old_max_bifidos)),
             mode="constant",
             constant_values=0.0,
         )
         self.bifido_is_seed = np.pad(
             self.bifido_is_seed,
-            pad_width=np.array((0, old_max_bifidos)),
+            pad_width=np.array((0, self.MAX_BIFIDOS - old_max_bifidos)),
             mode="constant",
             constant_values=False,
         )
         self.bifido_is_stuck = np.pad(
             self.bifido_is_stuck,
-            pad_width=np.array((0, old_max_bifidos)),
+            pad_width=np.array((0, self.MAX_BIFIDOS - old_max_bifidos)),
             mode="constant",
             constant_values=False,
         )
         self.bifido_remaining_attempts = np.pad(
             self.bifido_remaining_attempts,
-            pad_width=np.array((0, old_max_bifidos)),
+            pad_width=np.array((0, self.MAX_BIFIDOS - old_max_bifidos)),
             mode="constant",
             constant_values=0,
         )
         self.bifido_mask = np.pad(
             self.bifido_mask,
-            pad_width=np.array((0, old_max_bifidos)),
+            pad_width=np.array((0, self.MAX_BIFIDOS - old_max_bifidos)),
             mode="constant",
             constant_values=False,
         )
@@ -571,49 +585,54 @@ class GutPython:
         self.desulfo_mask[self.num_desulfos :] = False
         self.desulfo_pointer = self.num_desulfos
 
-    def _expand_desulfo_arrays(self):
+    def _expand_desulfo_arrays(self, new_max_desulfos: Optional[int] = None) -> None:
         old_max_desulfos = self.MAX_DESULFOS
-        self.MAX_DESULFOS *= 2
+        if new_max_desulfos is None:
+            self.MAX_DESULFOS *= 2
+        else:
+            if new_max_desulfos <= self.MAX_DESULFOS:
+                return
+            self.MAX_DESULFOS = new_max_desulfos
 
         self.desulfo_locations = np.pad(
             self.desulfo_locations,
-            pad_width=np.array(((0, old_max_desulfos), (0, 0))),
+            pad_width=np.array(((0, self.MAX_DESULFOS - old_max_desulfos), (0, 0))),
             mode="constant",
             constant_values=(0, 0),
         )
         self.desulfo_age = np.pad(
             self.desulfo_age,
-            pad_width=np.array((0, old_max_desulfos)),
+            pad_width=np.array((0, self.MAX_DESULFOS - old_max_desulfos)),
             mode="constant",
             constant_values=0,
         )
         self.desulfo_energy = np.pad(
             self.desulfo_energy,
-            pad_width=np.array((0, old_max_desulfos)),
+            pad_width=np.array((0, self.MAX_DESULFOS - old_max_desulfos)),
             mode="constant",
             constant_values=0.0,
         )
         self.desulfo_is_seed = np.pad(
             self.desulfo_is_seed,
-            pad_width=np.array((0, old_max_desulfos)),
+            pad_width=np.array((0, self.MAX_DESULFOS - old_max_desulfos)),
             mode="constant",
             constant_values=False,
         )
         self.desulfo_is_stuck = np.pad(
             self.desulfo_is_stuck,
-            pad_width=np.array((0, old_max_desulfos)),
+            pad_width=np.array((0, self.MAX_DESULFOS - old_max_desulfos)),
             mode="constant",
             constant_values=False,
         )
         self.desulfo_remaining_attempts = np.pad(
             self.desulfo_remaining_attempts,
-            pad_width=np.array((0, old_max_desulfos)),
+            pad_width=np.array((0, self.MAX_DESULFOS - old_max_desulfos)),
             mode="constant",
             constant_values=0,
         )
         self.desulfo_mask = np.pad(
             self.desulfo_mask,
-            pad_width=np.array((0, old_max_desulfos)),
+            pad_width=np.array((0, self.MAX_DESULFOS - old_max_desulfos)),
             mode="constant",
             constant_values=False,
         )
@@ -682,49 +701,54 @@ class GutPython:
         self.clost_mask[self.num_closts :] = False
         self.clost_pointer = self.num_closts
 
-    def _expand_clost_arrays(self):
+    def _expand_clost_arrays(self, new_max_closts: Optional[int] = None) -> None:
         old_max_closts = self.MAX_CLOSTS
-        self.MAX_CLOSTS *= 2
+        if new_max_closts is None:
+            self.MAX_CLOSTS *= 2
+        else:
+            if new_max_closts < self.MAX_CLOSTS:
+                return
+            self.MAX_CLOSTS = new_max_closts
 
         self.clost_locations = np.pad(
             self.clost_locations,
-            pad_width=np.array(((0, old_max_closts), (0, 0))),
+            pad_width=np.array(((0, self.MAX_CLOSTS - old_max_closts), (0, 0))),
             mode="constant",
             constant_values=(0, 0),
         )
         self.clost_age = np.pad(
             self.clost_age,
-            pad_width=np.array((0, old_max_closts)),
+            pad_width=np.array((0, self.MAX_CLOSTS - old_max_closts)),
             mode="constant",
             constant_values=0,
         )
         self.clost_energy = np.pad(
             self.clost_energy,
-            pad_width=np.array((0, old_max_closts)),
+            pad_width=np.array((0, self.MAX_CLOSTS - old_max_closts)),
             mode="constant",
             constant_values=0.0,
         )
         self.clost_is_seed = np.pad(
             self.clost_is_seed,
-            pad_width=np.array((0, old_max_closts)),
+            pad_width=np.array((0, self.MAX_CLOSTS - old_max_closts)),
             mode="constant",
             constant_values=False,
         )
         self.clost_is_stuck = np.pad(
             self.clost_is_stuck,
-            pad_width=np.array((0, old_max_closts)),
+            pad_width=np.array((0, self.MAX_CLOSTS - old_max_closts)),
             mode="constant",
             constant_values=False,
         )
         self.clost_remaining_attempts = np.pad(
             self.clost_remaining_attempts,
-            pad_width=np.array((0, old_max_closts)),
+            pad_width=np.array((0, self.MAX_CLOSTS - old_max_closts)),
             mode="constant",
             constant_values=0,
         )
         self.clost_mask = np.pad(
             self.clost_mask,
-            pad_width=np.array((0, old_max_closts)),
+            pad_width=np.array((0, self.MAX_CLOSTS - old_max_closts)),
             mode="constant",
             constant_values=False,
         )
@@ -799,49 +823,54 @@ class GutPython:
         self.bacteroid_mask[self.num_bacteroids :] = False
         self.bacteroid_pointer = self.num_bacteroids
 
-    def _expand_bacteroid_arrays(self):
+    def _expand_bacteroid_arrays(self, new_max_bacteroids: Optional[int] = None) -> None:
         old_max_bacteroids = self.MAX_BACTEROIDS
-        self.MAX_BACTEROIDS *= 2
+        if new_max_bacteroids is None:
+            self.MAX_BACTEROIDS *= 2
+        else:
+            if new_max_bacteroids <= old_max_bacteroids:
+                return
+            self.MAX_BACTEROIDS = new_max_bacteroids
 
         self.bacteroid_locations = np.pad(
             self.bacteroid_locations,
-            pad_width=np.array(((0, old_max_bacteroids), (0, 0))),
+            pad_width=np.array(((0, self.MAX_BACTEROIDS - old_max_bacteroids), (0, 0))),
             mode="constant",
             constant_values=(0, 0),
         )
         self.bacteroid_age = np.pad(
             self.bacteroid_age,
-            pad_width=np.array((0, old_max_bacteroids)),
+            pad_width=np.array((0, self.MAX_BACTEROIDS - old_max_bacteroids)),
             mode="constant",
             constant_values=0,
         )
         self.bacteroid_energy = np.pad(
             self.bacteroid_energy,
-            pad_width=np.array((0, old_max_bacteroids)),
+            pad_width=np.array((0, self.MAX_BACTEROIDS - old_max_bacteroids)),
             mode="constant",
             constant_values=0.0,
         )
         self.bacteroid_is_seed = np.pad(
             self.bacteroid_is_seed,
-            pad_width=np.array((0, old_max_bacteroids)),
+            pad_width=np.array((0, self.MAX_BACTEROIDS - old_max_bacteroids)),
             mode="constant",
             constant_values=False,
         )
         self.bacteroid_is_stuck = np.pad(
             self.bacteroid_is_stuck,
-            pad_width=np.array((0, old_max_bacteroids)),
+            pad_width=np.array((0, self.MAX_BACTEROIDS - old_max_bacteroids)),
             mode="constant",
             constant_values=False,
         )
         self.bacteroid_remaining_attempts = np.pad(
             self.bacteroid_remaining_attempts,
-            pad_width=np.array((0, old_max_bacteroids)),
+            pad_width=np.array((0, self.MAX_BACTEROIDS - old_max_bacteroids)),
             mode="constant",
             constant_values=0,
         )
         self.bacteroid_mask = np.pad(
             self.bacteroid_mask,
-            pad_width=np.array((0, old_max_bacteroids)),
+            pad_width=np.array((0, self.MAX_BACTEROIDS - old_max_bacteroids)),
             mode="constant",
             constant_values=False,
         )
@@ -856,35 +885,40 @@ class GutPython:
         :param write_mode: e.g. append, write
         :return:
         """
-        # compute which class attributes should be saved
-        rep = {attr: getattr(self, attr) for attr in dir(self) if attr[0] != "_"}
-        rep = {k: v for k, v in rep.items() if isinstance(v, (int, float, bool, np.ndarray))}
 
         with h5py.File(filename, write_mode) as f:
             grp: h5py.Group = f.create_group(str(self.ticks))
-            skip_list = set.union(
-                *[
-                    {f"num_{spec}s", f"{spec}_pointer", f"{spec}_mask"}
-                    for spec in ["bifido", "bacteroid", "clost", "desulfo"]
-                ]
-            )
-            for k, v in rep.items():
+            for field in fields(type(self)):
                 # skip things that can be automatically reconstructed
-                if k in skip_list:
+                if self.field_is_bookkeeping(field):
                     continue
 
-                if isinstance(v, (int, float, bool)):
-                    # grp.create_dataset(k, shape=(), dtype=type(v), data=v, compression="gz")
-                    grp.create_dataset(k, shape=(), dtype=type(v), data=v)
+                value = getattr(self, field.name)
+
+                if isinstance(value, (int, float, bool)):
+                    # scalars can be directly saved
+                    ds = grp.create_dataset(field.name, shape=(), dtype=type(value), data=value)
+                    ds.attrs["type"] = field.metadata["type"]
                 else:
-                    # numpy array
-                    if np.issubdtype(v.dtype, np.object_):
-                        v = v.astype(int)
-                    for bact_type in ["bifido", "bacteroid", "clost", "desulfo"]:
-                        if k.startswith(bact_type):
-                            v = v[getattr(self, f"{bact_type}_mask")]
-                            break
-                    grp.create_dataset(k, shape=v.shape, dtype=v.dtype, data=v, compression="gz")
+                    # numpy arrays may need a bit of filtering first
+                    # convert any enum types to ints
+                    if np.issubdtype(value.dtype, np.object_):
+                        value = value.astype(int)
+                    # filter agent arrays to just the meaningful entries
+                    if self.field_is_agent(field):
+                        for bact_type in ["bacteroid", "bifido", "clost", "desulfo"]:
+                            if field.name.startswith(bact_type):
+                                value = value[getattr(self, f"{bact_type}_mask")]
+                                break
+                    ds = grp.create_dataset(
+                        field.name,
+                        shape=value.shape,
+                        dtype=value.dtype,
+                        data=value,
+                        compression="gzip",
+                        compression_opts=9,
+                    )
+                    ds.attrs["type"] = field.metadata["type"]
 
     @classmethod
     def load(cls, filename: str, time: int) -> "GutPython":
@@ -894,42 +928,45 @@ class GutPython:
         :param time: which time slice to load from
         :return:
         """
-        cell_types = ["bifido", "bacteroid", "clost", "desulfo"]
-        non_cell_init_fields = [
-            f
-            for f in fields(cls)
-            if f.init and not any(f.name.beginswith(cell_type) for cell_type in cell_types)
-        ]
-        cell_init_fields = [
-            f
-            for f in fields(cls)
-            if f.init and any(f.name.beginswith(cell_type) for cell_type in cell_types)
-        ]
 
-        with h5py.File(filename, "r+") as f:
-            grp: h5py.Group = f[str(time)]
+        cell_types = ["bacteroid", "bifido", "clost", "desulfo"]
+
+        cell_fields = [f.name for f in fields(cls) if cls.field_is_agent(f)]
+        # parameters, molecular fields, etc.
+        non_cell_init_fields = [
+            f.name for f in fields(cls) if cls.field_is_parameter(f) or cls.field_is_molecule(f)
+        ]
+        # measurements
+        measurement_fields = [f.name for f in fields(cls) if cls.field_is_measurement(f)]
+
+        with h5py.File(filename, "r") as h5file:
+            grp: h5py.Group = h5file[str(time)]
+
+            # parameters and molecular fields are loaded via init
             model = cls(
-                **{f: grp[f][()] for f in non_cell_init_fields},
+                **{field: cls.fix_scalar_type(grp[field][()]) for field in non_cell_init_fields},
             )
 
             # scalars not initialized by init
-            model.ticks = grp["time"][()]
+            model.ticks = int(grp["ticks"][()])  # Shouldn't this be the same as time?
+            for field in measurement_fields:
+                setattr(model, field, cls.fix_scalar_type(grp[field][()]))
 
+            # agents
+            # ensure there is enough space for agents
             num_cells = {
                 cell_type: grp[f"{cell_type}_locations"].shape[0] for cell_type in cell_types
             }
-            # ensure there is enough space
             for cell_type in cell_types:
-                if num_cells[cell_type] > getattr(model, f"{cell_type}_mask").size:
-                    getattr(model, f"_expand_{cell_type}_arrays")()
-
-            for field in cell_init_fields:
+                getattr(model, f"_expand_{cell_type}_arrays")(num_cells[cell_type])
+            # load agent properties
+            for field in cell_fields:
                 cell_type = field.split("_")[0]
                 model_field = getattr(model, field)
                 model_field[: num_cells[cell_type]] = grp[field][()]
-
+            # configure the bookkeeping fields
             for cell_type in cell_types:
-                setattr(model, f"num_{cell_type}", num_cells[cell_type])
+                setattr(model, f"num_{cell_type}s", num_cells[cell_type])
                 setattr(model, f"{cell_type}_pointer", num_cells[cell_type])
                 cell_mask = getattr(model, f"{cell_type}_mask")
                 cell_mask[: num_cells[cell_type]] = True
@@ -1152,11 +1189,6 @@ class GutPython:
         #   reset-ticks
 
         self.ticks = 0
-
-        #   ;; reset the testState
-        #   set testState 0
-
-        self.test_state = 0
 
     def go(self):
         # to go
@@ -2175,6 +2207,46 @@ class GutPython:
                 origin="lower",
                 extent=(0.0, field_array.shape[0], 0.0, field_array.shape[1]),
             )
+
+    @staticmethod
+    def field_is_bookkeeping(f):
+        return (
+            hasattr(f, "metadata") and "type" in f.metadata and f.metadata["type"] == "bookkeeping"
+        )
+
+    @staticmethod
+    def field_is_agent(f):
+        return hasattr(f, "metadata") and "type" in f.metadata and f.metadata["type"] == "agent"
+
+    @staticmethod
+    def field_is_parameter(f):
+        return hasattr(f, "metadata") and "type" in f.metadata and f.metadata["type"] == "parameter"
+
+    @staticmethod
+    def field_is_molecule(f):
+        return hasattr(f, "metadata") and "type" in f.metadata and f.metadata["type"] == "molecule"
+
+    @staticmethod
+    def field_is_measurement(f):
+        return (
+            hasattr(f, "metadata") and "type" in f.metadata and f.metadata["type"] == "measurement"
+        )
+
+    @staticmethod
+    def fix_scalar_type(f):
+        if isinstance(f, np.ndarray):
+            if np.issubdtype(f.dtype, np.floating):
+                return f.astype(np.float64)
+            elif np.issubdtype(f.dtype, np.integer):
+                return f.astype(np.int64)
+            else:
+                return f
+        elif np.issubdtype(f, np.floating):
+            return float(f)
+        elif np.issubdtype(f, np.integer):
+            return int(f)
+        else:
+            return f
 
 
 if __name__ == "__main__":
