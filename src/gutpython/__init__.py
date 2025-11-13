@@ -1,13 +1,23 @@
 import itertools
 import math
-from typing import Final, Iterable, Optional, Tuple
+from typing import Callable, Final, Iterable, Optional, Tuple, Union
 
+import dill
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 from attr import define, field, fields
 
 DEFAULT_SIZE = 200
+
+
+def scalar_to_function(
+    s: Union[Callable[[int], Union[int, float]], int, float],
+) -> Callable[[int], Union[int, float]]:
+    if isinstance(s, int) or isinstance(s, float):
+        return lambda t: s
+    else:
+        return s
 
 
 @define(kw_only=True, frozen=False)
@@ -61,13 +71,6 @@ class GutPython:
 
     flow_dist: float = field(default=0.28, metadata={"type": "parameter"})
 
-    inulin_inflow: float = field(default=10.0, metadata={"type": "parameter"})
-    fo_inflow: float = field(default=25.0, metadata={"type": "parameter"})
-    lactose_inflow: float = field(default=15.0, metadata={"type": "parameter"})
-    lactate_inflow: float = field(default=0.0, metadata={"type": "parameter"})
-    glucose_inflow: float = field(default=30.0, metadata={"type": "parameter"})
-    cs_inflow: float = field(default=0.1, metadata={"type": "parameter"})
-
     bifido_doub: int = field(default=330, metadata={"type": "parameter"})
     desulfo_doub: int = field(default=330, metadata={"type": "parameter"})
     bacteroid_doub: int = field(default=330, metadata={"type": "parameter"})
@@ -78,12 +81,42 @@ class GutPython:
     clost_flow_const: float = field(default=1.0, metadata={"type": "parameter"})
     bacteroid_flow_const: float = field(default=1.0, metadata={"type": "parameter"})
 
-    in_conc_bacteroids: int = field(default=0, metadata={"type": "parameter"})
-    in_conc_bifidos: int = field(default=0, metadata={"type": "parameter"})
-    in_conc_closts: int = field(default=0, metadata={"type": "parameter"})
-    in_conc_desulfos: int = field(default=0, metadata={"type": "parameter"})
+    ######################################################################
+    # in flow parameters (controls)
 
     tick_in_flow: int = field(default=480, metadata={"type": "parameter"})
+
+    inulin_inflow: Callable[[int], float] = field(
+        default=lambda t: 10.0, converter=scalar_to_function, metadata={"type": "control"}
+    )
+    fo_inflow: Callable[[int], float] = field(
+        default=lambda t: 25.0, converter=scalar_to_function, metadata={"type": "control"}
+    )
+    lactose_inflow: Callable[[int], float] = field(
+        default=lambda t: 15.0, converter=scalar_to_function, metadata={"type": "control"}
+    )
+    lactate_inflow: Callable[[int], float] = field(
+        default=lambda t: 0.0, converter=scalar_to_function, metadata={"type": "control"}
+    )
+    glucose_inflow: Callable[[int], float] = field(
+        default=lambda t: 30.0, converter=scalar_to_function, metadata={"type": "control"}
+    )
+    cs_inflow: Callable[[int], float] = field(
+        default=lambda t: 0.1, converter=scalar_to_function, metadata={"type": "control"}
+    )
+
+    in_conc_bacteroids: Callable[[int], int] = field(
+        default=lambda t: 0, converter=scalar_to_function, metadata={"type": "control"}
+    )
+    in_conc_bifidos: Callable[[int], int] = field(
+        default=lambda t: 0, converter=scalar_to_function, metadata={"type": "control"}
+    )
+    in_conc_closts: Callable[[int], int] = field(
+        default=lambda t: 0, converter=scalar_to_function, metadata={"type": "control"}
+    )
+    in_conc_desulfos: Callable[[int], int] = field(
+        default=lambda t: 0, converter=scalar_to_function, metadata={"type": "control"}
+    )
 
     ######################################################################
     # hidden parameters (magic constants)
@@ -814,8 +847,8 @@ class GutPython:
         :return:
         """
 
-        with h5py.File(filename, write_mode) as f:
-            grp: h5py.Group = f.create_group(str(self.ticks))
+        with h5py.File(filename, write_mode) as h5file:
+            grp: h5py.Group = h5file.create_group(str(self.ticks))
             for field in fields(type(self)):
                 # skip things that can be automatically reconstructed
                 if self.field_is_bookkeeping(field):
@@ -823,7 +856,14 @@ class GutPython:
 
                 value = getattr(self, field.name)
 
-                if isinstance(value, (int, float, bool)):
+                if self.field_is_control(field):
+                    ds = grp.create_dataset(field.name, data=np.void(dill.dumps(value)))
+                    ds.attrs["type"] = field.metadata["type"]
+                    ds_val = grp.create_dataset(
+                        field.name + "_value", shape=(), data=value(self.ticks - 1)
+                    )
+                    ds_val.attrs["type"] = field.metadata["type"] + "_value"
+                elif isinstance(value, (int, float, bool, np.int64, np.int8, np.float64, np.bool_)):
                     # scalars can be directly saved
                     ds = grp.create_dataset(field.name, shape=(), dtype=type(value), data=value)
                     ds.attrs["type"] = field.metadata["type"]
@@ -866,13 +906,20 @@ class GutPython:
         ]
         # measurements
         measurement_fields = [f.name for f in fields(cls) if cls.field_is_measurement(f)]
+        # controls
+        control_fields = [f.name for f in fields(cls) if cls.field_is_control(f)]
 
         with h5py.File(filename, "r") as h5file:
             grp: h5py.Group = h5file[str(time)]
 
+            controls = {field: dill.loads(grp[field][()]) for field in control_fields}
+            init_fields = {
+                field: cls.fix_scalar_type(grp[field][()]) for field in non_cell_init_fields
+            }
+
             # parameters and molecular fields are loaded via init
             model = cls(
-                **{field: cls.fix_scalar_type(grp[field][()]) for field in non_cell_init_fields},
+                **dict(init_fields, **controls),
             )
 
             # scalars not initialized by init
@@ -1465,12 +1512,12 @@ class GutPython:
         frac = self.flow_dist - lower_flow_dist
 
         for metabolite_name, metabolite, metabolite_inflow in [
-            ("inulin", self.inulin, self.inulin_inflow),
-            ("fo", self.fo, self.fo_inflow),
-            ("lactose", self.lactose, self.lactose_inflow),
-            ("lactate", self.lactate, self.lactate_inflow),
-            ("glucose", self.glucose, self.glucose_inflow),
-            ("cs", self.cs, self.cs_inflow),
+            ("inulin", self.inulin, self.inulin_inflow(self.ticks)),
+            ("fo", self.fo, self.fo_inflow(self.ticks)),
+            ("lactose", self.lactose, self.lactose_inflow(self.ticks)),
+            ("lactate", self.lactate, self.lactate_inflow(self.ticks)),
+            ("glucose", self.glucose, self.glucose_inflow(self.ticks)),
+            ("cs", self.cs, self.cs_inflow(self.ticks)),
         ]:
             # amount per patch. (i.e. evenly distributed vertically, per unit length in horizontal direction)
             metabolite_inflow_amt_per_patch = metabolite_inflow / (
@@ -1565,7 +1612,7 @@ class GutPython:
 
         # excrete
         bifido_excrete = (self.bifido_locations[:, 0] >= self.GRID_WIDTH) & self.bifido_mask
-        self.excreted_bifidos = np.sum(bifido_excrete)
+        self.excreted_bifidos = int(np.sum(bifido_excrete))
         self.bifido_mask[bifido_excrete] = False
         self.num_bifidos -= self.excreted_bifidos
 
@@ -1640,7 +1687,7 @@ class GutPython:
 
         # excrete
         desulfo_excrete = (self.desulfo_locations[:, 0] >= self.GRID_WIDTH) & self.desulfo_mask
-        self.excreted_desulfos = np.sum(desulfo_excrete)
+        self.excreted_desulfos = int(np.sum(desulfo_excrete))
         self.desulfo_mask[desulfo_excrete] = False
         self.num_desulfos -= self.excreted_desulfos
 
@@ -1710,7 +1757,7 @@ class GutPython:
 
         # excrete
         clost_excrete = (self.clost_locations[:, 0] >= self.GRID_WIDTH) & self.clost_mask
-        self.excreted_closts = np.sum(clost_excrete)
+        self.excreted_closts = int(np.sum(clost_excrete))
         self.clost_mask[clost_excrete] = False
         self.num_closts -= self.excreted_closts
 
@@ -1785,7 +1832,7 @@ class GutPython:
         bacteroid_excrete = (
             self.bacteroid_locations[:, 0] >= self.GRID_WIDTH
         ) & self.bacteroid_mask
-        self.excreted_bacteroids = np.sum(bacteroid_excrete)
+        self.excreted_bacteroids = int(np.sum(bacteroid_excrete))
         self.bacteroid_mask[bacteroid_excrete] = False
         self.num_bacteroids -= self.excreted_bacteroids
 
@@ -1900,7 +1947,7 @@ class GutPython:
         #     setxy min-pxcor - 0.5 random-ycor
         #   ]
 
-        for _ in range(self.in_conc_bifidos):
+        for _ in range(self.in_conc_bifidos(self.ticks)):
             self.create_bifido(
                 energy=100,
                 is_seed=False,
@@ -1923,7 +1970,7 @@ class GutPython:
         #   ]
         #
 
-        for _ in range(self.in_conc_desulfos):
+        for _ in range(self.in_conc_desulfos(self.ticks)):
             self.create_desulfo(
                 energy=100,
                 is_seed=False,
@@ -1946,7 +1993,7 @@ class GutPython:
         #
         #   ]
 
-        for _ in range(self.in_conc_closts):
+        for _ in range(self.in_conc_closts(self.ticks)):
             self.create_clost(
                 energy=100,
                 is_seed=False,
@@ -1970,7 +2017,7 @@ class GutPython:
         #   ]
         # end
 
-        for _ in range(self.in_conc_bacteroids):
+        for _ in range(self.in_conc_bacteroids(self.ticks)):
             self.create_bacteroid(
                 energy=100,
                 is_seed=False,
@@ -2151,6 +2198,10 @@ class GutPython:
         return (
             hasattr(f, "metadata") and "type" in f.metadata and f.metadata["type"] == "measurement"
         )
+
+    @staticmethod
+    def field_is_control(f):
+        return hasattr(f, "metadata") and "type" in f.metadata and f.metadata["type"] == "control"
 
     @staticmethod
     def fix_scalar_type(f):
