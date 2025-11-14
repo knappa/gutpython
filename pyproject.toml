@@ -21,10 +21,14 @@ dependencies = [
     "numpy",
     "h5py",
     "attrs",
-    "tqdm",
-    "jupyter",
     "matplotlib",
     "dill",
+]
+
+[project.optional-dependencies]
+all = [
+    "jupyter",
+    "tqdm",
 ]
 
 [project.scripts]
