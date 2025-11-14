@@ -1,4 +1,5 @@
 import itertools
+import logging
 import math
 from typing import Callable, Final, Iterable, Optional, Tuple, Union
 
@@ -8,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from attr import define, field, fields
 
+logger = logging.getLogger(__name__)
 DEFAULT_SIZE = 200
 
 
@@ -133,20 +135,6 @@ class GutPython:
     ticks: int = field(default=0, metadata={"type": "parameter"})
 
     ######################################################################
-    # static properties
-
-    @property
-    def geometry(self) -> Tuple[int, int]:
-        return self.GRID_WIDTH, self.GRID_HEIGHT
-
-    ######################################################################
-    # dynamic properties
-
-    @property
-    def num_bacteria(self):
-        return self.num_closts + self.num_bifidos + self.num_bacteroids + self.num_bacteroids
-
-    ######################################################################
     # measurements
 
     sim_terminated: bool = field(default=False, init=False, metadata={"type": "bookkeeping"})
@@ -170,6 +158,20 @@ class GutPython:
     absorbed_lactate: float = field(default=0.0, init=False, metadata={"type": "measurement"})
     absorbed_glucose: float = field(default=0.0, init=False, metadata={"type": "measurement"})
     absorbed_cs: float = field(default=0.0, init=False, metadata={"type": "measurement"})
+
+    ######################################################################
+    # static properties
+
+    @property
+    def geometry(self) -> Tuple[int, int]:
+        return self.GRID_WIDTH, self.GRID_HEIGHT
+
+    ######################################################################
+    # dynamic properties
+
+    @property
+    def num_bacteria(self):
+        return self.num_closts + self.num_bifidos + self.num_bacteroids + self.num_bacteroids
 
     @property
     def mean_bacteroid_energy(self):
@@ -1166,6 +1168,10 @@ class GutPython:
         self.ticks = 0
 
     def go(self):
+        if self.sim_terminated:
+            logger.error("Simulation has already terminated! Refusing to continue.")
+            return
+
         # to go
         # ;; This function determines the behavior at each time tick
         #
@@ -1174,7 +1180,11 @@ class GutPython:
 
         # ACK: removed
         # self.stop_check()
-        if self.num_bacteria > 1000000 or self.num_bacteria <= 0:
+        if self.num_bacteria > 1000000:
+            logger.warning(f"Simulation overwhelmed by bacteria N:{self.num_bacteria}")
+            self.sim_terminated = True
+        if self.num_bacteria <= 0:
+            logger.warning("Bacteria died out!")
             self.sim_terminated = True
 
         #   ;; Modify the energy level of each turtle and metabolite level of each patch
@@ -1566,31 +1576,20 @@ class GutPython:
             np.clip(metabolite, 0, 1000, out=metabolite)
             metabolite[metabolite < 0.001] = 0
 
-            if self.GRID_WIDTH == 1:
-                absorption = self.true_absorption * (1 - self.reserve_fraction) * metabolite
-                setattr(
-                    self,
-                    f"absorbed_{metabolite_name}",
-                    float(np.sum(absorption[:, :])),
+            absorption = (
+                self.true_absorption
+                * (
+                    1
+                    - self.reserve_fraction * np.linspace(1.0, 0.0, self.GRID_WIDTH)[:, np.newaxis]
                 )
-                metabolite[:, :] -= absorption
-            else:
-                absorption = (
-                    self.true_absorption
-                    * (
-                        1
-                        - self.reserve_fraction
-                        * np.arange(self.GRID_WIDTH)[::-1, np.newaxis]
-                        / (self.GRID_WIDTH - 1)
-                    )
-                    * metabolite
-                )
-                setattr(
-                    self,
-                    f"absorbed_{metabolite_name}",
-                    float(np.sum(absorption[:, :])),
-                )
-                metabolite[:, :] -= absorption
+                * metabolite
+            )
+            setattr(
+                self,
+                f"absorbed_{metabolite_name}",
+                float(np.sum(absorption[:, :])),
+            )
+            metabolite[:, :] -= absorption
 
     def bact_tick_behavior(self):
         # to bactTickBehavior
@@ -2044,21 +2043,21 @@ class GutPython:
         # 	]
         # end
 
-        total_bacteria = (
-            self.num_bacteroids + self.num_bifidos + self.num_closts + self.num_desulfos
-        )
-        assert total_bacteria > 0, "Bacteria died out!"
-
-        # TODO: package the constants
-        self.true_absorption = self.absorption * (
-            self.absorption_constant
-            / (
-                (0.8 * (self.num_desulfos / total_bacteria))
-                + (1 * (self.num_closts / total_bacteria))
-                + (1.2 * (self.num_bacteroids / total_bacteria))
-                + (0.7 * (self.num_bifidos / total_bacteria))
+        total_bacteria = self.num_bacteria
+        if total_bacteria <= 0:
+            logger.warning("Bacteria died out!")
+            self.sim_terminated = True
+        else:
+            # TODO: package the constants
+            self.true_absorption = self.absorption * (
+                self.absorption_constant
+                / (
+                    (0.8 * (self.num_desulfos / total_bacteria))
+                    + (1 * (self.num_closts / total_bacteria))
+                    + (1.2 * (self.num_bacteroids / total_bacteria))
+                    + (0.7 * (self.num_bifidos / total_bacteria))
+                )
             )
-        )
 
     def set_stuck_chance(self):
         occupancy = np.zeros(self.geometry, dtype=np.int64)
