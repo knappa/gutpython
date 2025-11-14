@@ -128,10 +128,6 @@ class GutPython:
     ######################################################################
     # other globals
 
-    true_absorption: float = field(
-        default=0.0, metadata={"type": "parameter"}
-    )  # TODO: understand units.
-
     ticks: int = field(default=0, metadata={"type": "parameter"})
 
     ######################################################################
@@ -1150,7 +1146,8 @@ class GutPython:
         #   ;; setup the true absorption rate
         #   setTrueAbs
 
-        self.set_true_abs()
+        # ACK: refactored away
+        # self.set_true_abs()
 
         #   ;; setup the stuckChance
         #   setStuckChance
@@ -1217,7 +1214,8 @@ class GutPython:
         #   ;; change the trueAbsorption
         #   setTrueAbs
 
-        self.set_true_abs()
+        # ACK: refactored out
+        # self.set_true_abs()
 
         #   ;; make agents into seeds
         #   createSeeds
@@ -1517,6 +1515,29 @@ class GutPython:
 
         :return: None
         """
+
+        total_bacteria = self.num_bacteria
+        if total_bacteria <= 0:
+            logger.warning("Bacteria died out!")
+            self.sim_terminated = True
+            do_absorption = False
+            true_absorption = 0.0
+        elif self.absorption == 0.0:
+            do_absorption = False
+            true_absorption = 0.0
+        else:
+            do_absorption = True
+            # TODO: package the constants
+            true_absorption = self.absorption * (
+                self.absorption_constant
+                / (
+                    (0.8 * (self.num_desulfos / total_bacteria))
+                    + (1 * (self.num_closts / total_bacteria))
+                    + (1.2 * (self.num_bacteroids / total_bacteria))
+                    + (0.7 * (self.num_bifidos / total_bacteria))
+                )
+            )
+
         lower_flow_dist: int = math.floor(self.flow_dist)
         upper_flow_dist: int = lower_flow_dist + 1
         frac = self.flow_dist - lower_flow_dist
@@ -1576,20 +1597,28 @@ class GutPython:
             np.clip(metabolite, 0, 1000, out=metabolite)
             metabolite[metabolite < 0.001] = 0
 
-            absorption = (
-                self.true_absorption
-                * (
-                    1
-                    - self.reserve_fraction * np.linspace(1.0, 0.0, self.GRID_WIDTH)[:, np.newaxis]
+            if do_absorption:
+                absorption = (
+                    true_absorption
+                    * (
+                        1
+                        - self.reserve_fraction
+                        * np.linspace(1.0, 0.0, self.GRID_WIDTH)[:, np.newaxis]
+                    )
+                    * metabolite
                 )
-                * metabolite
-            )
-            setattr(
-                self,
-                f"absorbed_{metabolite_name}",
-                float(np.sum(absorption[:, :])),
-            )
-            metabolite[:, :] -= absorption
+                setattr(
+                    self,
+                    f"absorbed_{metabolite_name}",
+                    float(np.sum(absorption[:, :])),
+                )
+                metabolite[:, :] -= absorption
+            else:
+                setattr(
+                    self,
+                    f"absorbed_{metabolite_name}",
+                    0.0,
+                )
 
     def bact_tick_behavior(self):
         # to bactTickBehavior
@@ -2023,40 +2052,6 @@ class GutPython:
                 is_stuck=False,
                 age=np.random.randint(1000),
                 location=[0.0, np.random.rand()],
-            )
-
-    def set_true_abs(self):
-        # to setTrueAbs
-        #   ;; controls the true absorption rate
-        #
-        #   ;; 0.723823204 is the weighted average immune response coefficient calculated for
-        #   ;; Healthy bacteria gut percentages. This allows the absorption to change due to
-        #   ;; bacteria populations, simulating immune response.
-        #
-        # 	ifelse (any? turtles)[
-        #   	set trueAbsorption absorption * (0.723823204 / ((0.8 * ((count desulfos) / (count turtles))) +
-        #   	(1 * ((count closts) / (count turtles)))+(1.2 * ((count bacteroides) / (count turtles))) +
-        #   	(0.7 * ((count bifidos) / (count turtles)))))
-        # 	][
-        # 		set trueAbsorption 0
-        # print "ERROR! Bacteria died out. Problem with simulation leading to inaccurate results. Terminating Program."
-        # 	]
-        # end
-
-        total_bacteria = self.num_bacteria
-        if total_bacteria <= 0:
-            logger.warning("Bacteria died out!")
-            self.sim_terminated = True
-        else:
-            # TODO: package the constants
-            self.true_absorption = self.absorption * (
-                self.absorption_constant
-                / (
-                    (0.8 * (self.num_desulfos / total_bacteria))
-                    + (1 * (self.num_closts / total_bacteria))
-                    + (1.2 * (self.num_bacteroids / total_bacteria))
-                    + (0.7 * (self.num_bifidos / total_bacteria))
-                )
             )
 
     def set_stuck_chance(self):
