@@ -1034,7 +1034,7 @@ class GutPython:
             for cp_name in computed_properties:
                 value = getattr(self, cp_name)
                 # scalars can be directly saved
-                ds = grp.create_dataset(field.name, shape=(), dtype=type(value), data=value)
+                ds = grp.create_dataset(cp_name, shape=(), dtype=type(value), data=value)
                 ds.attrs["type"] = "computed_property"
 
     @classmethod
