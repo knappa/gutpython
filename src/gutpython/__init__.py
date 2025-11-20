@@ -59,15 +59,15 @@ class GutPython:
     )  # TODO: understand units.
 
     init_num_bifidos: int = field(
-        default=23562, metadata={"type": "parameter"}
+        default=23562, metadata={"type": "init_parameter"}
     )  # TODO: uhh? Seems awfully specific.
     init_num_bacteroids: int = field(
-        default=5490, metadata={"type": "parameter"}
+        default=5490, metadata={"type": "init_parameter"}
     )  # TODO: uhh? Seems awfully specific.
     init_num_closts: int = field(
-        default=921, metadata={"type": "parameter"}
+        default=921, metadata={"type": "init_parameter"}
     )  # TODO: uhh? Seems awfully specific.
-    init_num_desulfos: int = field(default=70, metadata={"type": "parameter"})
+    init_num_desulfos: int = field(default=70, metadata={"type": "init_parameter"})
 
     bifido_lactate_production: float = field(default=0.005, metadata={"type": "parameter"})
 
@@ -1051,7 +1051,11 @@ class GutPython:
         cell_fields = [f.name for f in fields(cls) if cls.field_is_agent(f)]
         # parameters, molecular fields, etc.
         non_cell_init_fields = [
-            f.name for f in fields(cls) if cls.field_is_parameter(f) or cls.field_is_molecule(f)
+            f.name
+            for f in fields(cls)
+            if cls.field_is_parameter(f)
+            or cls.field_is_init_parameter(f)
+            or cls.field_is_molecule(f)
         ]
         # measurements
         measurement_fields = [f.name for f in fields(cls) if cls.field_is_measurement(f)]
@@ -2333,6 +2337,14 @@ class GutPython:
     @staticmethod
     def field_is_parameter(f):
         return hasattr(f, "metadata") and "type" in f.metadata and f.metadata["type"] == "parameter"
+
+    @staticmethod
+    def field_is_init_parameter(f):
+        return (
+            hasattr(f, "metadata")
+            and "type" in f.metadata
+            and f.metadata["type"] == "init_parameter"
+        )
 
     @staticmethod
     def field_is_molecule(f):
