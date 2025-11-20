@@ -176,16 +176,150 @@ class GutPython:
         )
 
     @property
+    def mean_bacteroid_age(self):
+        return np.mean(self.bacteroid_age[self.bacteroid_mask]) if self.num_bacteroids > 0 else 0.0
+
+    @property
+    def prop_bacteroid_is_seed(self):
+        return (
+            np.sum(self.bacteroid_is_seed & self.bacteroid_mask) / self.num_bacteroids
+            if self.num_bacteroids > 0
+            else 0.0
+        )
+
+    @property
+    def prop_bacteroid_is_stuck(self):
+        return (
+            np.sum(self.bacteroid_is_stuck & self.bacteroid_mask) / self.num_bacteroids
+            if self.num_bacteroids > 0
+            else 0.0
+        )
+
+    @property
+    def bacteroid_location_centroid(self):
+        return (
+            np.mean(self.bacteroid_locations[self.bacteroid_mask], axis=0)
+            if self.num_bacteroids > 0
+            else 0.0
+        )
+
+    @property
     def mean_bifido_energy(self):
         return np.mean(self.bifido_energy[self.bifido_mask]) if self.num_bifidos > 0 else 0.0
+
+    @property
+    def mean_bifido_age(self):
+        return np.mean(self.bifido_age[self.bifido_mask]) if self.num_bifidos > 0 else 0.0
+
+    @property
+    def prop_bifido_is_seed(self):
+        return (
+            np.sum(self.bifido_is_seed & self.bifido_mask) / self.num_bifidos
+            if self.num_bifidos > 0
+            else 0.0
+        )
+
+    @property
+    def prop_bifido_is_stuck(self):
+        return (
+            np.sum(self.bifido_is_stuck & self.bifido_mask) / self.num_bifidos
+            if self.num_bifidos > 0
+            else 0.0
+        )
+
+    @property
+    def bifido_location_centroid(self):
+        return (
+            np.mean(self.bifido_locations[self.bifido_mask], axis=0)
+            if self.num_bifidos > 0
+            else 0.0
+        )
 
     @property
     def mean_clost_energy(self):
         return np.mean(self.clost_energy[self.clost_mask]) if self.num_closts > 0 else 0.0
 
     @property
+    def mean_clost_age(self):
+        return np.mean(self.clost_age[self.clost_mask]) if self.num_closts > 0 else 0.0
+
+    @property
+    def prop_clost_is_seed(self):
+        return (
+            np.sum(self.clost_is_seed & self.clost_mask) / self.num_closts
+            if self.num_closts > 0
+            else 0.0
+        )
+
+    @property
+    def prop_clost_is_stuck(self):
+        return (
+            np.sum(self.clost_is_stuck & self.clost_mask) / self.num_closts
+            if self.num_closts > 0
+            else 0.0
+        )
+
+    @property
+    def clost_location_centroid(self):
+        return (
+            np.mean(self.clost_locations[self.clost_mask], axis=0) if self.num_closts > 0 else 0.0
+        )
+
+    @property
     def mean_desulfo_energy(self):
         return np.mean(self.desulfo_energy[self.desulfo_mask]) if self.num_desulfos > 0 else 0.0
+
+    @property
+    def mean_desulfo_age(self):
+        return np.mean(self.desulfo_age[self.desulfo_mask]) if self.num_desulfos > 0 else 0.0
+
+    @property
+    def prop_desulfo_is_seed(self):
+        return (
+            np.sum(self.desulfo_is_seed & self.desulfo_mask) / self.num_desulfos
+            if self.num_desulfos > 0
+            else 0.0
+        )
+
+    @property
+    def prop_desulfo_is_stuck(self):
+        return (
+            np.sum(self.desulfo_is_stuck & self.desulfo_mask) / self.num_desulfos
+            if self.num_desulfos > 0
+            else 0.0
+        )
+
+    @property
+    def desulfo_location_centroid(self):
+        return (
+            np.mean(self.desulfo_locations[self.desulfo_mask], axis=0)
+            if self.num_desulfos > 0
+            else 0.0
+        )
+
+    @property
+    def total_cs(self):
+        return np.sum(self.cs)
+
+    @property
+    def total_fo(self):
+        return np.sum(self.fo)
+
+    @property
+    def total_glucose(self):
+        return np.sum(self.glucose)
+
+    @property
+    def total_inulin(self):
+        return np.sum(self.inulin)
+
+    @property
+    def total_lactate(self):
+        return np.sum(self.lactate)
+
+    @property
+    def total_lactose(self):
+        return np.sum(self.lactose)
 
     ######################################################################
     # bifidobacteria
@@ -861,7 +995,7 @@ class GutPython:
                         field.name + "_value", shape=(), data=value(self.ticks - 1)
                     )
                     ds_val.attrs["type"] = field.metadata["type"] + "_value"
-                elif isinstance(value, (int, float, bool, np.int64, np.int8, np.float64, np.bool_)):
+                elif np.isscalar(value):
                     # scalars can be directly saved
                     ds = grp.create_dataset(field.name, shape=(), dtype=type(value), data=value)
                     ds.attrs["type"] = field.metadata["type"]
@@ -885,6 +1019,23 @@ class GutPython:
                         compression_opts=9,
                     )
                     ds.attrs["type"] = field.metadata["type"]
+
+            # also save computed properties.
+            # These won't be reloaded, but it's nice to have them in the hdf5
+            field_names = [f.name for f in fields(self.__class__)]
+            computed_properties = [
+                cp_name
+                for cp_name in dir(self)
+                if not cp_name.startswith("_")
+                and cp_name not in field_names
+                and np.isscalar(getattr(self, cp_name))
+                and not isinstance(getattr(self, cp_name), str)
+            ]
+            for cp_name in computed_properties:
+                value = getattr(self, cp_name)
+                # scalars can be directly saved
+                ds = grp.create_dataset(field.name, shape=(), dtype=type(value), data=value)
+                ds.attrs["type"] = "computed_property"
 
     @classmethod
     def load(cls, filename: str, time: int) -> "GutPython":
