@@ -200,7 +200,7 @@ class GutPython:
         return (
             np.mean(self.bacteroid_locations[self.bacteroid_mask], axis=0)
             if self.num_bacteroids > 0
-            else 0.0
+            else np.array([0.0, 0.0])
         )
 
     @property
@@ -232,7 +232,7 @@ class GutPython:
         return (
             np.mean(self.bifido_locations[self.bifido_mask], axis=0)
             if self.num_bifidos > 0
-            else 0.0
+            else np.array([0.0, 0.0])
         )
 
     @property
@@ -262,7 +262,9 @@ class GutPython:
     @property
     def clost_location_centroid(self):
         return (
-            np.mean(self.clost_locations[self.clost_mask], axis=0) if self.num_closts > 0 else 0.0
+            np.mean(self.clost_locations[self.clost_mask], axis=0)
+            if self.num_closts > 0
+            else np.array([0.0, 0.0])
         )
 
     @property
@@ -294,7 +296,7 @@ class GutPython:
         return (
             np.mean(self.desulfo_locations[self.desulfo_mask], axis=0)
             if self.num_desulfos > 0
-            else 0.0
+            else np.array([0.0, 0.0])
         )
 
     @property
@@ -1033,8 +1035,12 @@ class GutPython:
             ]
             for cp_name in computed_properties:
                 value = getattr(self, cp_name)
-                # scalars can be directly saved
-                ds = grp.create_dataset(cp_name, shape=(), dtype=type(value), data=value)
+                if np.isscalar(value):
+                    ds = grp.create_dataset(cp_name, shape=(), dtype=type(value), data=value)
+                else:
+                    ds = grp.create_dataset(
+                        cp_name, shape=value.shape, dtype=np.float32, data=value
+                    )
                 ds.attrs["type"] = "computed_property"
 
     @classmethod
