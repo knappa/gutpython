@@ -1006,6 +1006,9 @@ class GutPython:
                     # convert any enum types to ints
                     if np.issubdtype(value.dtype, np.object_):
                         value = value.astype(int)
+                    # no need for float64's
+                    if np.issubdtype(value.dtype, np.floating):
+                        value = value.astype(np.float32)
                     # filter agent arrays to just the meaningful entries
                     if self.field_is_agent(field):
                         for bact_type in ["bacteroid", "bifido", "clost", "desulfo"]:
@@ -1038,8 +1041,11 @@ class GutPython:
                 if np.isscalar(value):
                     ds = grp.create_dataset(cp_name, shape=(), dtype=type(value), data=value)
                 else:
+                    # no need for float64's
+                    if np.issubdtype(value.dtype, np.floating):
+                        value = value.astype(np.float32)
                     ds = grp.create_dataset(
-                        cp_name, shape=value.shape, dtype=np.float32, data=value
+                        cp_name, shape=value.shape, dtype=value.dtype, data=value
                     )
                 ds.attrs["type"] = "computed_property"
 
