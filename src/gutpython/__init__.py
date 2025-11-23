@@ -339,7 +339,7 @@ class GutPython:
 
     @bifido_locations.default
     def _bifido_locations_factory(self):
-        return np.zeros((self.MAX_BIFIDOS, 2), dtype=np.float64)
+        return np.zeros((self.MAX_BIFIDOS, 2), dtype=np.float32)
 
     bifido_age = field(type=np.ndarray, metadata={"type": "agent"})
 
@@ -363,7 +363,7 @@ class GutPython:
 
     @bifido_energy.default
     def _bifido_energy_factory(self):
-        return np.zeros(self.MAX_BIFIDOS, dtype=np.float64)
+        return np.zeros(self.MAX_BIFIDOS, dtype=np.float32)
 
     ######################################################################
     # desulfovibro
@@ -381,7 +381,7 @@ class GutPython:
 
     @desulfo_locations.default
     def _desulfo_locations_factory(self):
-        return np.zeros((self.MAX_DESULFOS, 2), dtype=np.float64)
+        return np.zeros((self.MAX_DESULFOS, 2), dtype=np.float32)
 
     desulfo_age = field(type=np.ndarray, metadata={"type": "agent"})
 
@@ -405,7 +405,7 @@ class GutPython:
 
     @desulfo_energy.default
     def _desulfo_energy_factory(self):
-        return np.zeros(self.MAX_DESULFOS, dtype=np.float64)
+        return np.zeros(self.MAX_DESULFOS, dtype=np.float32)
 
     ######################################################################
     # clostridia
@@ -423,7 +423,7 @@ class GutPython:
 
     @clost_locations.default
     def _clost_locations_factory(self):
-        return np.zeros((self.MAX_CLOSTS, 2), dtype=np.float64)
+        return np.zeros((self.MAX_CLOSTS, 2), dtype=np.float32)
 
     clost_age = field(type=np.ndarray, metadata={"type": "agent"})
 
@@ -447,7 +447,7 @@ class GutPython:
 
     @clost_energy.default
     def _clost_energy_factory(self):
-        return np.zeros(self.MAX_CLOSTS, dtype=np.float64)
+        return np.zeros(self.MAX_CLOSTS, dtype=np.float32)
 
     ######################################################################
     # bacteroides
@@ -465,7 +465,7 @@ class GutPython:
 
     @bacteroid_locations.default
     def _bacteroid_locations_factory(self):
-        return np.zeros((self.MAX_BACTEROIDS, 2), dtype=np.float64)
+        return np.zeros((self.MAX_BACTEROIDS, 2), dtype=np.float32)
 
     bacteroid_age = field(type=np.ndarray, metadata={"type": "agent"})
 
@@ -489,7 +489,7 @@ class GutPython:
 
     @bacteroid_energy.default
     def _bacteroid_energy_factory(self):
-        return np.zeros(self.MAX_BACTEROIDS, dtype=np.float64)
+        return np.zeros(self.MAX_BACTEROIDS, dtype=np.float32)
 
     ######################################################################
     # patches
@@ -498,7 +498,7 @@ class GutPython:
 
     @glucose.default
     def _glucose_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
+        return np.full(self.geometry, 0.0, dtype=np.float32)
 
     ########################################
 
@@ -506,7 +506,7 @@ class GutPython:
 
     @fo.default
     def _fo_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
+        return np.full(self.geometry, 0.0, dtype=np.float32)
 
     ########################################
 
@@ -514,7 +514,7 @@ class GutPython:
 
     @lactose.default
     def _lactose_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
+        return np.full(self.geometry, 0.0, dtype=np.float32)
 
     ########################################
 
@@ -522,7 +522,7 @@ class GutPython:
 
     @lactate.default
     def _lactate_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
+        return np.full(self.geometry, 0.0, dtype=np.float32)
 
     ########################################
 
@@ -530,7 +530,7 @@ class GutPython:
 
     @inulin.default
     def _inulin_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
+        return np.full(self.geometry, 0.0, dtype=np.float32)
 
     ########################################
 
@@ -538,7 +538,7 @@ class GutPython:
 
     @cs.default
     def _cs_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
+        return np.full(self.geometry, 0.0, dtype=np.float32)
 
     ########################################
 
@@ -546,7 +546,7 @@ class GutPython:
 
     @stuck_chance.default
     def _stuck_chance_factory(self):
-        return np.full(self.geometry, 0.0, dtype=np.float64)
+        return np.full(self.geometry, 0.0, dtype=np.float32)
 
     ######################################################################
     # Bifidobacteria utility functions
@@ -584,7 +584,7 @@ class GutPython:
                 self.geometry
             ) * np.random.rand(2)
         else:
-            self.bifido_locations[self.bifido_pointer, :] = np.array(location).astype(np.float64)
+            self.bifido_locations[self.bifido_pointer, :] = np.array(location).astype(np.float32)
 
         self.bifido_age[self.bifido_pointer] = age
         self.bifido_energy[self.bifido_pointer] = energy
@@ -688,7 +688,7 @@ class GutPython:
                 self.geometry
             ) * np.random.rand(2)
         else:
-            self.desulfo_locations[self.desulfo_pointer, :] = np.array(location).astype(np.float64)
+            self.desulfo_locations[self.desulfo_pointer, :] = np.array(location).astype(np.float32)
 
         self.desulfo_age[self.desulfo_pointer] = age
         self.desulfo_energy[self.desulfo_pointer] = energy
@@ -792,7 +792,7 @@ class GutPython:
                 2
             )
         else:
-            self.clost_locations[self.clost_pointer, :] = np.array(location).astype(np.float64)
+            self.clost_locations[self.clost_pointer, :] = np.array(location).astype(np.float32)
 
         self.clost_age[self.clost_pointer] = age
         self.clost_energy[self.clost_pointer] = energy
@@ -897,7 +897,7 @@ class GutPython:
             ) * np.random.rand(2)
         else:
             self.bacteroid_locations[self.bacteroid_pointer, :] = np.array(location).astype(
-                np.float64
+                np.float32
             )
 
         self.bacteroid_age[self.bacteroid_pointer] = age
@@ -1033,7 +1033,10 @@ class GutPython:
                 for cp_name in dir(self)
                 if not cp_name.startswith("_")
                 and cp_name not in field_names
-                and np.isscalar(getattr(self, cp_name))
+                and (
+                    np.isscalar(getattr(self, cp_name))
+                    or isinstance(getattr(self, cp_name), np.ndarray)
+                )
                 and not isinstance(getattr(self, cp_name), str)
             ]
             for cp_name in computed_properties:
@@ -1806,7 +1809,9 @@ class GutPython:
         self.bifido_locations[movable_bifidos, 0] += self.flow_dist * self.bifido_flow_const
 
         # excrete
-        bifido_excrete = (self.bifido_locations[:, 0] >= self.GRID_WIDTH) & self.bifido_mask
+        bifido_excrete = (
+            self.bifido_locations[:, 0].astype(np.float32) >= self.GRID_WIDTH
+        ) & self.bifido_mask
         self.excreted_bifidos = int(np.sum(bifido_excrete))
         self.bifido_mask[bifido_excrete] = False
         self.num_bifidos -= self.excreted_bifidos
@@ -1881,7 +1886,9 @@ class GutPython:
         self.desulfo_locations[movable_desulfos, 0] += self.flow_dist * self.desulfo_flow_const
 
         # excrete
-        desulfo_excrete = (self.desulfo_locations[:, 0] >= self.GRID_WIDTH) & self.desulfo_mask
+        desulfo_excrete = (
+            self.desulfo_locations[:, 0].astype(np.float32) >= self.GRID_WIDTH
+        ) & self.desulfo_mask
         self.excreted_desulfos = int(np.sum(desulfo_excrete))
         self.desulfo_mask[desulfo_excrete] = False
         self.num_desulfos -= self.excreted_desulfos
@@ -1951,7 +1958,9 @@ class GutPython:
         self.clost_locations[movable_closts, 0] += self.flow_dist * self.clost_flow_const
 
         # excrete
-        clost_excrete = (self.clost_locations[:, 0] >= self.GRID_WIDTH) & self.clost_mask
+        clost_excrete = (
+            self.clost_locations[:, 0].astype(np.float32) >= self.GRID_WIDTH
+        ) & self.clost_mask
         self.excreted_closts = int(np.sum(clost_excrete))
         self.clost_mask[clost_excrete] = False
         self.num_closts -= self.excreted_closts
@@ -2025,7 +2034,7 @@ class GutPython:
 
         # excrete
         bacteroid_excrete = (
-            self.bacteroid_locations[:, 0] >= self.GRID_WIDTH
+            self.bacteroid_locations[:, 0].astype(np.float32) >= self.GRID_WIDTH
         ) & self.bacteroid_mask
         self.excreted_bacteroids = int(np.sum(bacteroid_excrete))
         self.bacteroid_mask[bacteroid_excrete] = False
@@ -2376,7 +2385,7 @@ class GutPython:
     def fix_scalar_type(f):
         if isinstance(f, np.ndarray):
             if np.issubdtype(f.dtype, np.floating):
-                return f.astype(np.float64)
+                return f.astype(np.float32)
             elif np.issubdtype(f.dtype, np.integer):
                 return f.astype(np.int64)
             else:
