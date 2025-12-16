@@ -542,7 +542,7 @@ class GutPython:
 
     ########################################
 
-    stuck_chance = field(type=np.ndarray, metadata={"type": "molecule"})
+    stuck_chance = field(type=np.ndarray, metadata={"type": "bookkeeping"})
 
     @stuck_chance.default
     def _stuck_chance_factory(self):
@@ -1024,6 +1024,13 @@ class GutPython:
                         compression_opts=9,
                     )
                     ds.attrs["type"] = field.metadata["type"]
+                    if self.field_is_molecule(field):
+                        ds.dims[0].label = 'x'
+                        ds.dims[1].label = 'y'
+                    elif self.field_is_agent(field):
+                        ds.dims[0].label = 'cell_idx'
+                        if field.name.endswith("_locations"):
+                            ds.dims[1].label = 'xy'
 
             # also save computed properties.
             # These won't be reloaded, but it's nice to have them in the hdf5
@@ -1114,6 +1121,9 @@ class GutPython:
                 cell_mask = getattr(model, f"{cell_type}_mask")
                 cell_mask[: num_cells[cell_type]] = True
                 cell_mask[num_cells[cell_type] :] = False
+
+        # computed bookkeeping field
+        model.set_stuck_chance()
 
         return model
 
@@ -1319,7 +1329,7 @@ class GutPython:
         # ACK: refactored away
         # self.set_true_abs()
 
-        #   ;; setup the stuckChance
+        #   ;; set up the stuckChance
         #   setStuckChance
 
         self.set_stuck_chance()
