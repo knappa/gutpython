@@ -31,6 +31,10 @@ class GutPython:
     MAX_CLOSTS: int = field(default=DEFAULT_SIZE, metadata={"type": "bookkeeping"})
     MAX_BACTEROIDS: int = field(default=DEFAULT_SIZE, metadata={"type": "bookkeeping"})
 
+    rng: np.random.Generator = field(
+        factory=lambda: np.random.default_rng(), metadata={"type": "bookkeeping"}
+    )
+
     ######################################################################
     # parameters from interface
 
@@ -582,7 +586,7 @@ class GutPython:
         if location is None:
             self.bifido_locations[self.bifido_pointer, :] = np.array(
                 self.geometry
-            ) * np.random.rand(2)
+            ) * self.rng.random(2)
         else:
             self.bifido_locations[self.bifido_pointer, :] = np.array(location).astype(np.float32)
 
@@ -686,7 +690,7 @@ class GutPython:
         if location is None:
             self.desulfo_locations[self.desulfo_pointer, :] = np.array(
                 self.geometry
-            ) * np.random.rand(2)
+            ) * self.rng.random(2)
         else:
             self.desulfo_locations[self.desulfo_pointer, :] = np.array(location).astype(np.float32)
 
@@ -788,7 +792,7 @@ class GutPython:
                 self._expand_clost_arrays()
 
         if location is None:
-            self.clost_locations[self.clost_pointer, :] = np.array(self.geometry) * np.random.rand(
+            self.clost_locations[self.clost_pointer, :] = np.array(self.geometry) * self.rng.random(
                 2
             )
         else:
@@ -894,7 +898,7 @@ class GutPython:
         if location is None:
             self.bacteroid_locations[self.bacteroid_pointer, :] = np.array(
                 self.geometry
-            ) * np.random.rand(2)
+            ) * self.rng.random(2)
         else:
             self.bacteroid_locations[self.bacteroid_pointer, :] = np.array(location).astype(
                 np.float32
@@ -1025,12 +1029,12 @@ class GutPython:
                     )
                     ds.attrs["type"] = field.metadata["type"]
                     if self.field_is_molecule(field):
-                        ds.dims[0].label = 'x'
-                        ds.dims[1].label = 'y'
+                        ds.dims[0].label = "x"
+                        ds.dims[1].label = "y"
                     elif self.field_is_agent(field):
-                        ds.dims[0].label = 'cell_idx'
+                        ds.dims[0].label = "cell_idx"
                         if field.name.endswith("_locations"):
-                            ds.dims[1].label = 'xy'
+                            ds.dims[1].label = "xy"
 
             # also save computed properties.
             # These won't be reloaded, but it's nice to have them in the hdf5
@@ -1171,7 +1175,7 @@ class GutPython:
                 energy=100,
                 is_seed=idx < num_seed_bifidos,
                 is_stuck=True,
-                age=np.random.randint(1000),
+                age=int(self.rng.integers(low=0, high=1000)),
             )
 
         # create-desulfos (initNumDesulfos * (1 - seedPercent / 100)) [
@@ -1210,7 +1214,7 @@ class GutPython:
                 energy=100,
                 is_seed=idx < num_seed_desulfos,
                 is_stuck=True,
-                age=np.random.randint(1000),
+                age=int(self.rng.integers(low=0, high=1000)),
             )
 
         # create-closts (initNumClosts * (1 - seedPercent / 100)) [
@@ -1249,7 +1253,7 @@ class GutPython:
                 energy=100,
                 is_seed=idx < num_seed_closts,
                 is_stuck=True,
-                age=np.random.randint(1000),
+                age=int(self.rng.integers(low=0, high=1000)),
             )
 
         # create-bacteroides (initNumBacteroides * (1 - seedPercent / 100)) [
@@ -1288,7 +1292,7 @@ class GutPython:
                 energy=100,
                 is_seed=idx < num_seed_bacteroids,
                 is_stuck=True,
-                age=np.random.randint(1000),
+                age=int(self.rng.integers(low=0, high=1000)),
             )
 
         # ;; initializes the patch variables
@@ -1484,10 +1488,10 @@ class GutPython:
         while eating_iters < max_eating_iters and len(hungry_bacteria) > 0:
             eating_iters += 1
 
-            hungry_cell_idx = np.random.randint(len(hungry_bacteria))
+            hungry_cell_idx = self.rng.integers(low=0, high=len(hungry_bacteria))
             bact_type, idx = hungry_bacteria[hungry_cell_idx]
 
-            metabolite_idx = np.random.randint(len(metabolites))
+            metabolite_idx = self.rng.integers(low=0, high=len(metabolites))
             metabolite = metabolites[metabolite_idx]
 
             self.bact_eat(bact_type, idx, metabolite)
@@ -1500,6 +1504,9 @@ class GutPython:
                 hungry_bacteria.pop(hungry_cell_idx)
 
     def bact_eat(self, bact_type, idx, metabolite):
+
+        loc = tuple(np.trunc(getattr(self, f"{bact_type}_locations")[idx]).astype(int))
+
         match metabolite:
             case "cs":
                 #   if (metaNum = 10)[;;CS
@@ -1518,7 +1525,6 @@ class GutPython:
                 #   ]
                 if bact_type != "desulfo":
                     return
-                loc = tuple(getattr(self, f"{bact_type}_locations")[idx].astype(int))
                 if self.cs[loc] >= 1:
                     getattr(self, f"{bact_type}_energy")[idx] += 50
                     self.cs[loc] -= 1
@@ -1550,7 +1556,6 @@ class GutPython:
                 #   ]
                 if bact_type not in {"clost", "bacteroid", "bifido"}:
                     return
-                loc = tuple(getattr(self, f"{bact_type}_locations")[idx].astype(int).T)
                 if self.fo[loc] >= 1:
                     getattr(self, f"{bact_type}_energy")[idx] += 50 if bact_type == "bifido" else 25
                     self.fo[loc] -= 1
@@ -1584,7 +1589,6 @@ class GutPython:
                 #   ]
                 if bact_type not in {"clost", "bacteroid", "bifido"}:
                     return
-                loc = tuple(getattr(self, f"{bact_type}_locations")[idx].astype(int).T)
                 if self.glucose[loc] >= 1:
                     getattr(self, f"{bact_type}_energy")[idx] += 25 if bact_type == "bifido" else 50
                     self.glucose[loc] -= 1
@@ -1618,7 +1622,6 @@ class GutPython:
                 #   ]
                 if bact_type not in {"clost", "bacteroid", "bifido"}:
                     return
-                loc = tuple(getattr(self, f"{bact_type}_locations")[idx].astype(int).T)
                 if self.inulin[loc] >= 1:
                     getattr(self, f"{bact_type}_energy")[idx] += 25
                     self.inulin[loc] -= 1
@@ -1642,7 +1645,6 @@ class GutPython:
                 #   ]
                 if bact_type != "desulfo":
                     return
-                loc = tuple(getattr(self, f"{bact_type}_locations")[idx].astype(int))
                 if self.lactate[loc] >= 1:
                     getattr(self, f"{bact_type}_energy")[idx] += 50
                     self.lactate[loc] -= 1
@@ -1679,7 +1681,6 @@ class GutPython:
                 #   ]
                 if bact_type not in {"clost", "bacteroid", "bifido"}:
                     return
-                loc = tuple(getattr(self, f"{bact_type}_locations")[idx].astype(int))
                 if self.lactose[loc] >= 1:
                     getattr(self, f"{bact_type}_energy")[idx] += 25 if bact_type == "clost" else 50
                     self.lactose[loc] -= 1
@@ -1838,13 +1839,13 @@ class GutPython:
         sticking_bifidos = (
             self.bifido_mask
             & ~self.bifido_is_stuck
-            & (np.random.rand(*self.bifido_mask.shape) < (self.stuck_chance[bifido_locs] / 100.0))
+            & (self.rng.random(*self.bifido_mask.shape) < (self.stuck_chance[bifido_locs] / 100.0))
         )
         self.bifido_is_stuck[sticking_bifidos] = True
         unsticking_bifidos = (
             self.bifido_mask
             & self.bifido_is_stuck
-            & (np.random.rand(self.bifido_is_stuck.shape[0]) < (self.unstuck_chance / 100.0))
+            & (self.rng.random(self.bifido_is_stuck.shape[0]) < (self.unstuck_chance / 100.0))
         )
         self.bifido_is_stuck[unsticking_bifidos] = False
 
@@ -1916,7 +1917,7 @@ class GutPython:
             self.desulfo_mask
             & ~self.desulfo_is_stuck
             & (
-                np.random.rand(*self.desulfo_is_stuck.shape)
+                self.rng.random(*self.desulfo_is_stuck.shape)
                 < (self.stuck_chance[desulfo_locs] / 100.0)
             )
         )
@@ -1924,7 +1925,7 @@ class GutPython:
         unsticking_desulfos = (
             self.desulfo_mask
             & self.desulfo_is_stuck
-            & (np.random.rand(*self.desulfo_is_stuck.shape) < (self.unstuck_chance / 100.0))
+            & (self.rng.random(*self.desulfo_is_stuck.shape) < (self.unstuck_chance / 100.0))
         )
         self.desulfo_is_stuck[unsticking_desulfos] = False
 
@@ -1987,13 +1988,13 @@ class GutPython:
         sticking_closts = (
             self.clost_mask
             & ~self.clost_is_stuck
-            & (np.random.rand(*self.clost_mask.shape) < (self.stuck_chance[clost_locs] / 100.0))
+            & (self.rng.random(*self.clost_mask.shape) < (self.stuck_chance[clost_locs] / 100.0))
         )
         self.clost_is_stuck[sticking_closts] = True
         unsticking_closts = (
             self.clost_mask
             & self.clost_is_stuck
-            & (np.random.rand(*self.clost_mask.shape) < (self.unstuck_chance / 100.0))
+            & (self.rng.random(*self.clost_mask.shape) < (self.unstuck_chance / 100.0))
         )
         self.clost_is_stuck[unsticking_closts] = False
 
@@ -2063,7 +2064,7 @@ class GutPython:
             self.bacteroid_mask
             & ~self.bacteroid_is_stuck
             & (
-                np.random.rand(self.bacteroid_is_stuck.shape[0])
+                self.rng.random(self.bacteroid_is_stuck.shape[0])
                 < (self.stuck_chance[bacteroid_locs] / 100.0)
             )
         )
@@ -2071,7 +2072,7 @@ class GutPython:
         unsticking_bacteroids = (
             self.bacteroid_mask
             & self.bacteroid_is_stuck
-            & (np.random.rand(self.bacteroid_is_stuck.shape[0]) < (self.unstuck_chance / 100.0))
+            & (self.rng.random(self.bacteroid_is_stuck.shape[0]) < (self.unstuck_chance / 100.0))
         )
         self.bacteroid_is_stuck[unsticking_bacteroids] = False
 
@@ -2114,22 +2115,22 @@ class GutPython:
 
         self.bacteroid_is_seed[
             self.bacteroid_is_stuck
-            & (np.random.rand(self.bacteroid_mask.shape[0]) < (self.seed_chance / 100.0))
+            & (self.rng.random(self.bacteroid_mask.shape[0]) < (self.seed_chance / 100.0))
         ] = True
 
         self.bifido_is_seed[
             self.bifido_is_stuck
-            & (np.random.rand(self.bifido_mask.shape[0]) < (self.seed_chance / 100.0))
+            & (self.rng.random(self.bifido_mask.shape[0]) < (self.seed_chance / 100.0))
         ] = True
 
         self.clost_is_seed[
             self.clost_is_stuck
-            & (np.random.rand(self.clost_mask.shape[0]) < (self.seed_chance / 100.0))
+            & (self.rng.random(self.clost_mask.shape[0]) < (self.seed_chance / 100.0))
         ] = True
 
         self.desulfo_is_seed[
             self.desulfo_is_stuck
-            & (np.random.rand(self.desulfo_mask.shape[0]) < (self.seed_chance / 100.0))
+            & (self.rng.random(self.desulfo_mask.shape[0]) < (self.seed_chance / 100.0))
         ] = True
 
     def bact_in(self):
@@ -2166,8 +2167,8 @@ class GutPython:
                 energy=100,
                 is_seed=False,
                 is_stuck=False,
-                age=np.random.randint(1000),
-                location=[0.0, np.random.rand()],
+                age=int(self.rng.integers(low=0, high=1000)),
+                location=[0.0, self.rng.random()],
             )
 
         #   create-desulfos inConcDesulfos [
@@ -2189,8 +2190,8 @@ class GutPython:
                 energy=100,
                 is_seed=False,
                 # is_stuck=False,
-                age=np.random.randint(1000),
-                location=[0.0, np.random.rand()],
+                age=int(self.rng.integers(low=0, high=1000)),
+                location=[0.0, self.rng.random()],
             )
 
         #   create-closts inConcClosts [
@@ -2212,8 +2213,8 @@ class GutPython:
                 energy=100,
                 is_seed=False,
                 is_stuck=False,
-                age=np.random.randint(1000),
-                location=[0.0, np.random.rand()],
+                age=int(self.rng.integers(low=0, high=1000)),
+                location=[0.0, self.rng.random()],
             )
 
         #   create-bacteroides inConcBacteroides [
@@ -2236,8 +2237,8 @@ class GutPython:
                 energy=100,
                 is_seed=False,
                 is_stuck=False,
-                age=np.random.randint(1000),
-                location=[0.0, np.random.rand()],
+                age=int(self.rng.integers(low=0, high=1000)),
+                location=[0.0, self.rng.random()],
             )
 
     def set_stuck_chance(self):
