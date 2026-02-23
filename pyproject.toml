@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gutpython"
-dynamic = ["version"]
+version = "0.0.0"
 authors = [
     { name = "Adam C Knapp", email = "adam.knapp@medicine.ufl.edu" },
 ]
@@ -15,7 +15,7 @@ requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
     "numpy",
@@ -28,14 +28,9 @@ dependencies = [
 [project.optional-dependencies]
 all = [
     "jupyter",
+    "ipympl",
     "tqdm",
 ]
-
-[project.scripts]
-#pruning = "pruning:main_cli"
-#pruning_stack = "pruning.stack:main_cli"
-#pruning_halfstack = "pruning.halfstack:main_cli"
-
 
 [project.urls]
 Homepage = "https://github.com/knappa/gutpython"

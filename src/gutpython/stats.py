@@ -1,6 +1,6 @@
 import numpy as np
 
-mean_agent_microstate_means: np.ndarray = np.array(
+mean_agent_age_energy: np.ndarray = np.array(
     # fmt: off
     # @formatter:off
     [
@@ -14,7 +14,7 @@ mean_agent_microstate_means: np.ndarray = np.array(
     dtype=np.float32,
 )
 
-std_agent_microstate_means: np.ndarray = np.array(
+std_agent_age_energy: np.ndarray = np.array(
     # fmt: off
     # @formatter:off
     [
