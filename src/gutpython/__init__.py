@@ -172,7 +172,7 @@ class GutPython:
 
     @property
     def num_bacteria(self):
-        return self.num_closts + self.num_bifidos + self.num_bacteroids + self.num_bacteroids
+        return self.num_closts + self.num_bifidos + self.num_bacteroids + self.num_desulfos
 
     @property
     def mean_bacteroid_energy(self):
@@ -1524,8 +1524,8 @@ class GutPython:
                 if self.fo[loc] >= 1:
                     getattr(self, f"{bact_type}_energy")[idx] += 50 if bact_type == "bifido" else 25
                     self.fo[loc] -= 1
-                if bact_type == "bifido":
-                    self.lactate[loc] += self.bifido_lactate_production
+                    if bact_type == "bifido":
+                        self.lactate[loc] += self.bifido_lactate_production
             case "glucose":
                 #   if (metaNum = 12)[;;GLUCOSE
                 #     ifelse (breed = closts or breed = bacteroides)[
@@ -1557,8 +1557,8 @@ class GutPython:
                 if self.glucose[loc] >= 1:
                     getattr(self, f"{bact_type}_energy")[idx] += 25 if bact_type == "bifido" else 50
                     self.glucose[loc] -= 1
-                if bact_type == "bifido":
-                    self.lactate[loc] += self.bifido_lactate_production
+                    if bact_type == "bifido":
+                        self.lactate[loc] += self.bifido_lactate_production
             case "inulin":
                 #   if (metaNum = 13)[;;INULIN
                 #     ifelse (breed = closts or breed = bacteroides)[
@@ -1590,9 +1590,8 @@ class GutPython:
                 if self.inulin[loc] >= 1:
                     getattr(self, f"{bact_type}_energy")[idx] += 25
                     self.inulin[loc] -= 1
-                if bact_type == "bifido":
-                    self.lactate[loc] += self.bifido_lactate_production
-                pass
+                    if bact_type == "bifido":
+                        self.lactate[loc] += self.bifido_lactate_production
             case "lactate":
                 #   if (metaNum = 14)[;;LACTATE
                 #     ifelse (breed = (desulfos))[
@@ -1649,9 +1648,8 @@ class GutPython:
                 if self.lactose[loc] >= 1:
                     getattr(self, f"{bact_type}_energy")[idx] += 25 if bact_type == "clost" else 50
                     self.lactose[loc] -= 1
-                if bact_type == "bifido":
-                    self.lactate[loc] += self.bifido_lactate_production
-                pass
+                    if bact_type == "bifido":
+                        self.lactate[loc] += self.bifido_lactate_production
             case _:
                 assert False
 
@@ -1715,11 +1713,8 @@ class GutPython:
                         self,
                         f"excreted_{metabolite_name}",
                         float(
-                            frac
-                            * (
-                                np.sum(metabolite[-upper_flow_dist, :])
-                                + np.sum(metabolite[-upper_flow_dist:, :])
-                            )
+                            np.sum(metabolite[-lower_flow_dist:, :])
+                            + frac * np.sum(metabolite[-upper_flow_dist, :])
                         ),
                     )
                     metabolite[upper_flow_dist:, :] = (
@@ -1733,7 +1728,7 @@ class GutPython:
                 setattr(
                     self,
                     f"excreted_{metabolite_name}",
-                    float(frac * (np.sum(metabolite[-lower_flow_dist:, :]))),
+                    float(np.sum(metabolite[-lower_flow_dist:, :])),
                 )
                 metabolite[lower_flow_dist:, :] = metabolite[:-lower_flow_dist, :]
 
@@ -2154,7 +2149,7 @@ class GutPython:
             self.create_desulfo(
                 energy=100,
                 is_seed=False,
-                # is_stuck=False,
+                is_stuck=False,
                 age=int(self.rng.integers(low=0, high=1000)),
                 location=[0.0, self.rng.random()],
             )
