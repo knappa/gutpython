@@ -1,8 +1,8 @@
+import functools
 import itertools
 import logging
 import math
-from collections.abc import Callable, Iterable
-from typing import Final, cast
+from typing import Callable, Final, Iterable, cast
 
 import dill
 import h5py
@@ -14,11 +14,16 @@ logger = logging.getLogger(__name__)
 DEFAULT_SIZE = 200
 
 
+# noinspection PyUnusedLocal
+def _constant_function(t: float, *, s: int | float) -> float | int:
+    return s
+
+
 def scalar_to_function(
-    s: Callable[[int], int | float] | int | float,
-) -> Callable[[int], int | float]:
+    s: int | float | Callable[[float], int | float],
+) -> Callable[[float], int | float]:
     if isinstance(s, int) or isinstance(s, float):
-        return lambda t: s
+        return functools.partial(_constant_function, s=s)
     else:
         return s
 
