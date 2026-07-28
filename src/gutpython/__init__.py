@@ -126,9 +126,9 @@ class GutPython:
     )
 
     ######################################################################
-    # hidden parameters (magic constants)
+    # other parameters
 
-    absorption_constant: Final[float] = 0.723823204
+    absorption_constant: Final[float] = field(default=0.723823204, metadata={"type": "parameter"})
 
     ######################################################################
     # other globals
