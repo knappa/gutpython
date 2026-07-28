@@ -2209,31 +2209,24 @@ class GutPython:
             )
 
     def set_stuck_chance(self):
-        occupancy = np.zeros(self.geometry, dtype=np.int64)
+        grid_width, grid_height = self.geometry
+        num_patches = grid_width * grid_height
 
-        geometry_bounds = np.array(self.geometry)
+        # counted flat, then reshaped: bincount tallies repeated locations, which the
+        # buffered form of occupancy[tuple(patches.T)] += 1 would not.
+        occupancy = np.zeros(num_patches, dtype=np.int64)
+        for bact_type in ["bifido", "desulfo", "clost", "bacteroid"]:
+            patches = getattr(self, f"{bact_type}_locations")[
+                getattr(self, f"{bact_type}_mask"), :
+            ].astype(np.int64)
 
-        bifido_patches = self.bifido_locations[self.bifido_mask, :].astype(np.int64)
-        # TODO: vectorize. need to check what happens with repeat locs using
-        #  occupancy[tuple(bifido_patches.T)] += 1
-        for idx in range(bifido_patches.shape[0]):
-            if np.all(bifido_patches[idx] < geometry_bounds):
-                occupancy[tuple(bifido_patches[idx])] += 1
+            # agents past the far end of the grid are excreted; they crowd no patch
+            in_bounds = (patches[:, 0] < grid_width) & (patches[:, 1] < grid_height)
+            flat_patch_idx = patches[in_bounds, 0] * grid_height + patches[in_bounds, 1]
 
-        desulfo_patches = self.desulfo_locations[self.desulfo_mask, :].astype(np.int64)
-        for idx in range(desulfo_patches.shape[0]):
-            if np.all(desulfo_patches[idx] < geometry_bounds):
-                occupancy[tuple(desulfo_patches[idx])] += 1
+            occupancy += np.bincount(flat_patch_idx, minlength=num_patches)
 
-        clost_patches = self.clost_locations[self.clost_mask, :].astype(np.int64)
-        for idx in range(clost_patches.shape[0]):
-            if np.all(clost_patches[idx] < geometry_bounds):
-                occupancy[tuple(clost_patches[idx])] += 1
-
-        bacteroid_patches = self.bacteroid_locations[self.bacteroid_mask, :].astype(np.int64)
-        for idx in range(bacteroid_patches.shape[0]):
-            if np.all(bacteroid_patches[idx] < geometry_bounds):
-                occupancy[tuple(bacteroid_patches[idx])] += 1
+        occupancy = occupancy.reshape(grid_width, grid_height)
 
         self.stuck_chance[:, :] = self.max_stuck_chance * (
             1 - occupancy / (self.mid_stuck_conc + occupancy)
