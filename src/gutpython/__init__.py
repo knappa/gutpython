@@ -1687,6 +1687,8 @@ class GutPython:
                 )
             )
 
+        assert self.flow_dist > 0.0, "flow_dist must be positive"
+
         lower_flow_dist: int = math.floor(self.flow_dist)
         upper_flow_dist: int = lower_flow_dist + 1
         frac = self.flow_dist - lower_flow_dist
