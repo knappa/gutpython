@@ -522,6 +522,33 @@ class GutPython:
     )
 
     ######################################################################
+    # agent utility functions
+
+    def _to_grid_location(self, location: Iterable) -> np.ndarray:
+        """
+        Convert a location to the float32 form held in the agent location arrays,
+        keeping it strictly inside the grid.
+
+        Rounding a float64 coordinate to float32 can carry it up onto a grid bound:
+        with GRID_HEIGHT of 1, a y of 0.9999999999999999 becomes exactly 1.0, which
+        truncates to patch index 1 and indexes off the end of a molecular field.
+        Clamping to the largest float32 below each bound keeps truncation in range.
+
+        :param location: a length-2 coordinate pair
+        :return: the clamped location, as float32
+        """
+        in_grid_bound = np.nextafter(np.array(self.geometry, dtype=np.float32), np.float32(0.0))
+        return np.minimum(np.asarray(location, dtype=np.float32), in_grid_bound)
+
+    def _random_grid_location(self) -> np.ndarray:
+        """
+        A uniformly random location, strictly inside the grid.
+
+        :return: the location, as float32
+        """
+        return self._to_grid_location(np.array(self.geometry) * self.rng.random(2))
+
+    ######################################################################
     # Bifidobacteria utility functions
 
     def create_bifido(
@@ -553,11 +580,9 @@ class GutPython:
                 self._expand_bifido_arrays()
 
         if location is None:
-            self.bifido_locations[self.bifido_pointer, :] = np.array(
-                self.geometry
-            ) * self.rng.random(2)
+            self.bifido_locations[self.bifido_pointer, :] = self._random_grid_location()
         else:
-            self.bifido_locations[self.bifido_pointer, :] = np.array(location).astype(np.float32)
+            self.bifido_locations[self.bifido_pointer, :] = self._to_grid_location(location)
 
         self.bifido_age[self.bifido_pointer] = age
         self.bifido_energy[self.bifido_pointer] = energy
@@ -657,11 +682,9 @@ class GutPython:
                 self._expand_desulfo_arrays()
 
         if location is None:
-            self.desulfo_locations[self.desulfo_pointer, :] = np.array(
-                self.geometry
-            ) * self.rng.random(2)
+            self.desulfo_locations[self.desulfo_pointer, :] = self._random_grid_location()
         else:
-            self.desulfo_locations[self.desulfo_pointer, :] = np.array(location).astype(np.float32)
+            self.desulfo_locations[self.desulfo_pointer, :] = self._to_grid_location(location)
 
         self.desulfo_age[self.desulfo_pointer] = age
         self.desulfo_energy[self.desulfo_pointer] = energy
@@ -761,11 +784,9 @@ class GutPython:
                 self._expand_clost_arrays()
 
         if location is None:
-            self.clost_locations[self.clost_pointer, :] = np.array(self.geometry) * self.rng.random(
-                2
-            )
+            self.clost_locations[self.clost_pointer, :] = self._random_grid_location()
         else:
-            self.clost_locations[self.clost_pointer, :] = np.array(location).astype(np.float32)
+            self.clost_locations[self.clost_pointer, :] = self._to_grid_location(location)
 
         self.clost_age[self.clost_pointer] = age
         self.clost_energy[self.clost_pointer] = energy
@@ -865,13 +886,9 @@ class GutPython:
                 self._expand_bacteroid_arrays()
 
         if location is None:
-            self.bacteroid_locations[self.bacteroid_pointer, :] = np.array(
-                self.geometry
-            ) * self.rng.random(2)
+            self.bacteroid_locations[self.bacteroid_pointer, :] = self._random_grid_location()
         else:
-            self.bacteroid_locations[self.bacteroid_pointer, :] = np.array(location).astype(
-                np.float32
-            )
+            self.bacteroid_locations[self.bacteroid_pointer, :] = self._to_grid_location(location)
 
         self.bacteroid_age[self.bacteroid_pointer] = age
         self.bacteroid_energy[self.bacteroid_pointer] = energy
@@ -1475,6 +1492,8 @@ class GutPython:
 
     def bact_eat(self, bact_type, idx, metabolite):
 
+        # unclamped: locations are held strictly inside the grid by _to_grid_location, and
+        # agents carried past the far end by flow are unmasked in the same tick they cross
         loc = tuple(np.trunc(getattr(self, f"{bact_type}_locations")[idx]).astype(int))
 
         match metabolite:
@@ -2135,7 +2154,7 @@ class GutPython:
                 is_seed=False,
                 is_stuck=False,
                 age=int(self.rng.integers(low=0, high=1000)),
-                location=[0.0, self.rng.random()],
+                location=[0.0, self.GRID_HEIGHT * self.rng.random()],
             )
 
         #   create-desulfos inConcDesulfos [
@@ -2158,7 +2177,7 @@ class GutPython:
                 is_seed=False,
                 is_stuck=False,
                 age=int(self.rng.integers(low=0, high=1000)),
-                location=[0.0, self.rng.random()],
+                location=[0.0, self.GRID_HEIGHT * self.rng.random()],
             )
 
         #   create-closts inConcClosts [
@@ -2181,7 +2200,7 @@ class GutPython:
                 is_seed=False,
                 is_stuck=False,
                 age=int(self.rng.integers(low=0, high=1000)),
-                location=[0.0, self.rng.random()],
+                location=[0.0, self.GRID_HEIGHT * self.rng.random()],
             )
 
         #   create-bacteroides inConcBacteroides [
@@ -2205,7 +2224,7 @@ class GutPython:
                 is_seed=False,
                 is_stuck=False,
                 age=int(self.rng.integers(low=0, high=1000)),
-                location=[0.0, self.rng.random()],
+                location=[0.0, self.GRID_HEIGHT * self.rng.random()],
             )
 
     def set_stuck_chance(self):
