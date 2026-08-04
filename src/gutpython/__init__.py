@@ -28,6 +28,14 @@ def scalar_to_function(
         return s
 
 
+######################################################################
+# constants
+
+_absorption_constant: Final[float] = 0.723823204
+
+######################################################################
+
+
 @define(kw_only=True, frozen=False)
 class GutPython:
     GRID_WIDTH: int = field(default=100, metadata={"type": "parameter"})
@@ -129,11 +137,6 @@ class GutPython:
     in_conc_desulfos: Callable[[int], int | float] = field(
         default=lambda t: 0, converter=scalar_to_function, metadata={"type": "control"}
     )
-
-    ######################################################################
-    # other parameters
-
-    absorption_constant: Final[float] = field(default=0.723823204, metadata={"type": "parameter"})
 
     ######################################################################
     # other globals
@@ -1697,7 +1700,7 @@ class GutPython:
             do_absorption = True
             # TODO: package the constants
             true_absorption = self.absorption * (
-                self.absorption_constant
+                _absorption_constant
                 / (
                     (0.8 * (self.num_desulfos / total_bacteria))
                     + (1 * (self.num_closts / total_bacteria))
